@@ -10,14 +10,48 @@
   line-height: 24px;
   font-weight: 400;
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
+  /* Base colors (light theme defaults) */
+  --background-color: #f6f6f6;
+  --text-color: #0f0f0f;
+
+  /* UI tokens */
+  --button-bg: #c4c4c4;
+  --button-hover-bg: #d4d4d4;
+  --toggle-knob-bg: #fff9ef;
+  /* warm off-white for knob in light mode */
+
+  /* Table color tokens */
+  --table-page-bg: var(--background-color);
+  --table-header-bg: #f4ecde;
+  /* slightly darker than page */
+  --table-cell-bg: var(--background-color);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+}
+
+[data-theme="dark"] {
+  --background-color: #2f2f2f;
+  --text-color: #f6f6f6;
+  --button-bg: #0f0f0f98;
+  --button-hover-bg: #0f0f0f69;
+  /* Table color tokens */
+  --table-page-bg: var(--background-color);
+  --table-header-bg: #3a3a3a;
+  /* slightly lighter than page */
+  --table-cell-bg: var(--background-color);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--background-color, #f6f6f6);
+  color: var(--text-color, #0f0f0f);
 }
 
 body {
@@ -31,8 +65,8 @@ body {
   border: #5f5f5f;
   font-weight: 500;
   font-family: inherit;
-  color: #ffffff;
-  background-color: #5f5f5f;
+  color: var(--text-color, #ffffff);
+  background-color: var(--button-bg, #5f5f5f);
   outline: none;
 }
 
@@ -41,7 +75,7 @@ body {
 }
 
 .file-button:hover {
-  background-color: #8c8b8b;
+  background-color: var(--button-hover-bg, #8c8b8b);
 }
 
 .upload-section {
@@ -54,6 +88,7 @@ body {
 
 h1 {
   text-align: left;
+  color: var(--text-color, #0f0f0f);
 }
 
 .app-header {
@@ -101,6 +136,105 @@ h1 {
   }
 }
 
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.theme-toggle-input {
+  display: none;
+}
+
+.theme-toggle-label {
+  width: 56px;
+  /* slightly wider to give space for icons and knob */
+  height: 26px;
+  background-color: #5f5f5f;
+  display: block;
+  border-radius: 25px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  color: #ffffff;
+}
+
+.theme-toggle-inner {
+  width: 20px;
+  height: 20px;
+  background-color: var(--toggle-knob-bg, #fdeed6);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  transition: transform 0.25s cubic-bezier(.2, .9, .2, 1);
+  z-index: 1;
+  /* keep knob below icons so icons remain visible */
+}
+
+.theme-toggle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  display: block;
+  z-index: 2;
+  /* ensure icons render above the knob */
+  opacity: 1;
+  /* always visible */
+}
+
+.theme-toggle-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: currentColor;
+}
+
+.theme-toggle-icon-moon {
+  left: 8px;
+}
+
+.theme-toggle-icon-sun {
+  right: 8px;
+}
+
+.theme-toggle-input:checked+.theme-toggle-label {
+  /* keep checked visual (accent) but we override base background by theme rules below */
+  background-color: #808080;
+}
+
+.theme-toggle-input:checked+.theme-toggle-label .theme-toggle-inner {
+  transform: translateX(29px) translateY(-50%);
+  background-color: #2f2f2f;
+}
+
+/* Use a warmer, darker icon color in light mode so icons stay visible above the light knob */
+[data-theme="light"] .theme-toggle-label {
+  /* Current app mode: LIGHT
+    - Switch (label) should show the INACTIVE (dark) background
+     - Icons should use the LIGHT background color so they appear "light" */
+  background-color: #2f2f2f;
+  /* dark (inactive) */
+  color: var(--background-color);
+  /* light/beige icons */
+}
+
+[data-theme="dark"] .theme-toggle-label {
+  /* Current app mode: DARK
+    - Switch should show the INACTIVE (light) background
+     - Icons should be dark/grey to appear "dark" */
+  background-color: #968d7e;
+  /* light (inactive) */
+  color: #2f2f2f;
+  /* dark grey icons */
+}
+
 .sliding-nav {
   position: relative;
   display: flex;
@@ -111,7 +245,7 @@ h1 {
   position: absolute;
   bottom: -1px;
   height: 3px;
-  background: rgb(255, 255, 255);
+  background: var(--text-color, rgb(205, 21, 21));
 
   left: var(--underline-left, 0);
   width: var(--underline-width, 0);
@@ -125,11 +259,67 @@ h1 {
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   font-size: 1rem;
-  color: #616161;
+  color: var(--text-color, #ffffff);
   font-weight: 500;
   transition: color 0.3s ease-out;
 }
 
 .sliding-nav button.active {
-  color: #ffffff;
+  color: var(--text-color, #ffffff);
+}
+
+
+[data-theme="light"] .handsontable .htCore td,
+[data-theme="light"] .handsontable .htCore th {
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background-color: var(--table-cell-bg) !important;
+}
+
+[data-theme="light"] .handsontable .htCore th {
+  background-color: var(--table-header-bg) !important;
+  /* header */
+  color: var(--text-color) !important;
+  font-weight: 600;
+}
+
+[data-theme="light"] .handsontable .htCore td:first-child {
+  /* Ensure first column cells (data rows) also use header bg in light mode */
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .handsontable .htCore td:first-child {
+  /* Ensure first column cells (data rows) also use header bg in dark mode */
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+}
+
+
+[data-theme="light"] .handsontable .ht_master .wtBorder,
+[data-theme="light"] .handsontable .wtHolder .wtBorder {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Dark mode Handsontable adjustments: keep editable cells same as page bg,
+   header and first (PDF) column slightly lighter than background. */
+[data-theme="dark"] .handsontable .htCore td,
+[data-theme="dark"] .handsontable .htCore th {
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background-color: var(--table-cell-bg) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .handsontable .htCore th,
+[data-theme="dark"] .handsontable .htCore td:first-child {
+  background-color: var(--table-header-bg) !important;
+  /* header + first column */
+  color: var(--text-color) !important;
+  font-weight: 600;
+}
+
+
+[data-theme="dark"] .handsontable .ht_master .wtBorder,
+[data-theme="dark"] .handsontable .wtHolder .wtBorder {
+  border-color: rgba(255, 255, 255, 0.06) !important;
 }

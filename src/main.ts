@@ -27,14 +27,35 @@ import 'handsontable/styles/ht-theme-main.min.css';
 
 /**
  * Interface representing a row of PDF data in the table
+ * Contains all possible fields for both Aufträge and Rechnungen modes
  */
 interface PdfDataRow {
   pdfName: string
   fullPath: string
-  rechnungsNr: string | null
-  datum: string | null
-  betrag: number | null
+  // Aufträge fields
+  datumAuftrag?: string | null
+  nummerAuftrag?: string | null
+  kunde?: string | null
+  lieferant?: string | null
+  produkt?: string | null
+  menge?: number | null
+  waehrung?: string | null
+  preis?: number | null
+  // Rechnungen fields
+  datumRechnung?: string | null
+  nummerRechnung?: string | null
+  gelieferteMenge?: number | null
 }
+
+/**
+ * Type definition for available modes
+ */
+type AppMode = 'auftraege' | 'rechnungen'
+
+/**
+ * Current active mode
+ */
+let currentMode: AppMode = 'auftraege'
 
 /**
  * Array storing paths of selected PDF files
@@ -47,12 +68,22 @@ let selectedPdfPaths: string[] = []
 document.addEventListener('DOMContentLoaded', () => {
   const selectFilesBtn = document.querySelector('#select-files-btn')
   const selectFolderBtn = document.querySelector('#select-folder-btn')
+  const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
 
   if (selectFilesBtn) {
     selectFilesBtn.addEventListener('click', handleSelectFiles)
   }
   if (selectFolderBtn) {
     selectFolderBtn.addEventListener('click', handleSelectFolder)
+  }
+
+  if (themeToggle) {
+    // Improve accessibility and ensure the visual switch styles are in sync
+    themeToggle.setAttribute('role', 'switch')
+    themeToggle.setAttribute('aria-checked', String(themeToggle.checked))
+    themeToggle.addEventListener('change', toggleTheme)
+    // Ensure the UI and document theme reflect the current toggle state on load
+    toggleTheme()
   }
 })
 
@@ -120,7 +151,7 @@ async function handleSelectFolder() {
 function updateFileUI() {
   if (!hot) return
 
-  const tableData = selectedPdfPaths.map(path => {
+  const tableData: PdfDataRow[] = selectedPdfPaths.map(path => {
     const lastSeparatorIndex = Math.max(
       path.lastIndexOf('/'),
       path.lastIndexOf('\\')
@@ -129,10 +160,7 @@ function updateFileUI() {
 
     return {
       pdfName: fileName,
-      fullPath: path,
-      rechnungsNr: null,
-      datum: null,
-      betrag: null
+      fullPath: path
     }
   })
 
@@ -161,16 +189,94 @@ document.addEventListener('DOMContentLoaded', () => {
     nav.style.setProperty('--underline-width', `${width}px`)
   }
 
-  buttons.forEach(button => {
+  buttons.forEach((button, index) => {
     button.addEventListener('click', () => {
       buttons.forEach(btn => btn.classList.remove('active'))
       button.classList.add('active')
       updateUnderlinePosition()
+
+      // Switch mode based on button index
+      const newMode: AppMode = index === 0 ? 'auftraege' : 'rechnungen'
+      if (currentMode !== newMode) {
+        currentMode = newMode
+        updateTableConfiguration()
+      }
     })
   })
 
   updateUnderlinePosition()
 })
+
+/**
+ * Get column headers based on current mode
+ */
+function getColumnHeaders(mode: AppMode): string[] {
+  if (mode === 'auftraege') {
+    return [
+      'PDF-Datei',
+      'Datum Auftrag',
+      'Nummer Auftrag',
+      'Kunde',
+      'Lieferant',
+      'Produkt',
+      'Menge',
+      'Währung',
+      'Preis'
+    ]
+  } else {
+    return [
+      'PDF-Datei',
+      'Datum Rechnung',
+      'Nummer Rechnung',
+      'Gelieferte Menge'
+    ]
+  }
+}
+
+/**
+ * Get column configuration based on current mode
+ */
+function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
+  if (mode === 'auftraege') {
+    return [
+      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink' },
+      { data: 'datumAuftrag', type: 'date', dateFormat: 'YYYY-MM-DD' },
+      { data: 'nummerAuftrag' },
+      { data: 'kunde' },
+      { data: 'lieferant' },
+      { data: 'produkt' },
+      { data: 'menge', type: 'numeric' },
+      { data: 'waehrung' },
+      { data: 'preis', type: 'numeric', numericFormat: { pattern: '0.00 €' } }
+    ]
+  } else {
+    return [
+      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink' },
+      { data: 'datumRechnung', type: 'date', dateFormat: 'YYYY-MM-DD' },
+      { data: 'nummerRechnung' },
+      { data: 'gelieferteMenge', type: 'numeric' }
+    ]
+  }
+}
+
+/**
+ * Update table configuration based on current mode
+ */
+function updateTableConfiguration() {
+  if (!hot) return
+
+  const currentData = hot.getSourceData() as PdfDataRow[]
+
+  hot.updateSettings({
+    colHeaders: getColumnHeaders(currentMode),
+    columns: getColumnConfig(currentMode)
+  })
+
+  // Reload data to ensure all rows are properly formatted
+  if (currentData.length > 0) {
+    hot.loadData(currentData)
+  }
+}
 
 /**
  * Custom renderer for ellipsis in table cells
@@ -206,20 +312,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   hot = new Handsontable(container, {
     data: [],
-    colHeaders: ['PDF-Datei'],
+    colHeaders: getColumnHeaders(currentMode),
     className: 'htEllipsis',
     renderer: ellipsisRenderer,
-    columns: [
-      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink' },
-      { data: 'rechnungsNr' },
-      { data: 'datum', type: 'date', dateFormat: 'YYYY-MM-DD' },
-      { data: 'betrag', type: 'numeric', numericFormat: { pattern: '0.00 €' } },
-      {},
-      {},
-      {},
-      {},
-      {}
-    ],
+    columns: getColumnConfig(currentMode),
 
     async afterOnCellMouseDown(_event, coords) {
       if (coords.col === 0 && hot) {
@@ -237,4 +333,45 @@ document.addEventListener('DOMContentLoaded', () => {
     themeName: 'ht-theme-main-dark-auto',
     licenseKey: 'non-commercial-and-evaluation'
   })
+
+  // Update Handsontable theme when global theme changes
+  const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
+  if (themeToggle) {
+    themeToggle.addEventListener('change', () => {
+      if (hot) {
+        const theme = themeToggle.checked ? 'light' : 'dark'
+        hot.updateSettings({
+          themeName: theme === 'light' ? 'ht-theme-main-light-auto' : 'ht-theme-main-dark-auto'
+        })
+      }
+    })
+  }
 })
+
+/**
+ * Toggle between light and dark themes
+ */
+function toggleTheme() {
+  const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
+  const themeLabel = document.querySelector('.theme-toggle-label') as HTMLElement | null
+  if (!themeToggle) return
+
+  const isChecked = themeToggle.checked
+  const theme = isChecked ? 'light' : 'dark'
+
+  // Apply theme to the document
+  document.documentElement.setAttribute('data-theme', theme)
+
+  // Accessibility: keep ARIA attributes in sync
+  themeToggle.setAttribute('aria-checked', String(isChecked))
+  if (themeLabel) {
+    themeLabel.setAttribute('aria-pressed', String(isChecked))
+  }
+
+  // If Handsontable is already initialized, update its theme immediately
+  if (hot) {
+    hot.updateSettings({
+      themeName: isChecked ? 'ht-theme-main-light-auto' : 'ht-theme-main-dark-auto'
+    })
+  }
+}
