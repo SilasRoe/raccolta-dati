@@ -13,8 +13,8 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "maggus",
-        "width": 800,
+        "title": "Datenerfassung",
+        "width": 1000,
         "height": 600
       }
     ],
