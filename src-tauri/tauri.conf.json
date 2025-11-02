@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "maggus",
+  "productName": "Raccolta Dati",
   "version": "0.1.0",
   "identifier": "com.silas.maggus",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Datenerfassung",
+        "title": "Raccolta Dati",
         "width": 1000,
         "height": 600
       }

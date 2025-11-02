@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function handleSelectFiles() {
   const result = await open({
-    title: 'PDF-Dateien auswählen',
+    title: 'Selezionare i file PDF',
     multiple: true,
     filters: [{
       name: 'PDF',
@@ -116,7 +116,7 @@ async function handleSelectFiles() {
  */
 async function handleSelectFolder() {
   const result = await open({
-    title: 'PDF-Ordner auswählen',
+    title: 'Selezionare la cartella PDF',
     directory: true,
     multiple: false
   })
@@ -213,22 +213,22 @@ document.addEventListener('DOMContentLoaded', () => {
 function getColumnHeaders(mode: AppMode): string[] {
   if (mode === 'auftraege') {
     return [
-      'PDF-Datei',
-      'Datum Auftrag',
-      'Nummer Auftrag',
-      'Kunde',
-      'Lieferant',
-      'Produkt',
-      'Menge',
-      'Währung',
-      'Preis'
+      'File PDF',
+      "Data",
+      'N°',
+      'Cliente',
+      'Casa Estera',
+      'Prodotto',
+      'kg/pz.',
+      'Val.',
+      'Prezzo kg/z.'
     ]
   } else {
     return [
-      'PDF-Datei',
-      'Datum Rechnung',
-      'Nummer Rechnung',
-      'Gelieferte Menge'
+      'File PDF',
+      'Data fattura Casa rapp.',
+      'N° fattura Casa rapp.',
+      'kg/pz.'
     ]
   }
 }
