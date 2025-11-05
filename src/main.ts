@@ -45,6 +45,10 @@ interface PdfDataRow {
   datumRechnung?: string | null
   nummerRechnung?: string | null
   gelieferteMenge?: number | null
+  // Freitext für Anmerkungen
+  anmerkungen?: string | null
+  // Bestätigungsflag für die gesamte Zeile
+  confirmed?: boolean | null
 }
 
 /**
@@ -161,10 +165,19 @@ function updateFileUI() {
     return {
       pdfName: fileName,
       fullPath: path
+      , confirmed: false
+      , anmerkungen: ''
     }
   })
 
   hot.loadData(tableData)
+  // Ensure header checkbox state is correct after loading new data
+  updateHeaderCheckboxState()
+  // Apply row classes for any pre-confirmed rows
+  const current = hot.getSourceData() as PdfDataRow[]
+  for (let i = 0; i < current.length; i++) {
+    applyRowConfirmedClass(i, Boolean(current[i].confirmed))
+  }
 }
 
 /**
@@ -221,16 +234,71 @@ function getColumnHeaders(mode: AppMode): string[] {
       'Prodotto',
       'kg/pz.',
       'Val.',
-      'Prezzo kg/z.'
+      'Prezzo kg/z.',
+      'Note'
     ]
   } else {
     return [
       'File PDF',
       'Data fattura Casa rapp.',
       'N° fattura Casa rapp.',
-      'kg/pz.'
+      'kg/pz.',
+      'Note'
     ]
   }
+}
+
+/**
+ * Renderer for the PDF name column that places the filename (left) and a checkbox (right).
+ * The checkbox stays in sync with the row's `confirmed` property.
+ */
+function pdfNameRenderer(
+  this: Handsontable.Core,
+  _instance: Handsontable.Core,
+  td: HTMLTableCellElement,
+  row: number,
+  _col: number,
+  _prop: string | number,
+  value: Handsontable.CellValue,
+  _cellProperties: Handsontable.CellProperties
+) {
+  // Keep base text rendering (for things like selection styling)
+  Handsontable.renderers.TextRenderer.apply(this, arguments as any)
+
+  // Ensure tooltip/title for full value
+  if (value !== null && value !== undefined) td.title = String(value)
+
+  td.classList.add('pdf-with-checkbox')
+  td.innerHTML = ''
+
+  const wrapper = document.createElement('div')
+  wrapper.className = 'pdf-cell-inner'
+
+  const span = document.createElement('span')
+  span.className = 'pdf-cell-text'
+  span.textContent = value !== null && value !== undefined ? String(value) : ''
+  span.title = span.textContent || ''
+  wrapper.appendChild(span)
+
+  const checkbox = document.createElement('input')
+  checkbox.type = 'checkbox'
+  checkbox.className = 'row-confirm-checkbox'
+
+  const rowData = hot ? (hot.getSourceDataAtRow(row) as PdfDataRow) : null
+  checkbox.checked = Boolean(rowData && rowData.confirmed)
+
+  checkbox.addEventListener('change', () => {
+    const checked = checkbox.checked
+    if (hot) {
+      hot.setDataAtRowProp(row, 'confirmed', checked)
+      applyRowConfirmedClass(row, checked)
+      hot.render()
+      updateHeaderCheckboxState()
+    }
+  })
+
+  wrapper.appendChild(checkbox)
+  td.appendChild(wrapper)
 }
 
 /**
@@ -239,7 +307,7 @@ function getColumnHeaders(mode: AppMode): string[] {
 function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
   if (mode === 'auftraege') {
     return [
-      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink' },
+      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
       { data: 'datumAuftrag', type: 'date', dateFormat: 'YYYY-MM-DD' },
       { data: 'nummerAuftrag' },
       { data: 'kunde' },
@@ -247,14 +315,16 @@ function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
       { data: 'produkt' },
       { data: 'menge', type: 'numeric' },
       { data: 'waehrung' },
-      { data: 'preis', type: 'numeric', numericFormat: { pattern: '0.00 €' } }
+      { data: 'preis', type: 'numeric', numericFormat: { pattern: '0.00 €' } },
+      { data: 'anmerkungen', type: 'text' }
     ]
   } else {
     return [
-      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink' },
+      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
       { data: 'datumRechnung', type: 'date', dateFormat: 'YYYY-MM-DD' },
       { data: 'nummerRechnung' },
-      { data: 'gelieferteMenge', type: 'numeric' }
+      { data: 'gelieferteMenge', type: 'numeric' },
+      { data: 'anmerkungen', type: 'text' }
     ]
   }
 }
@@ -276,6 +346,8 @@ function updateTableConfiguration() {
   if (currentData.length > 0) {
     hot.loadData(currentData)
   }
+  // Re-inject header checkbox after settings change (header DOM may be re-rendered)
+  setTimeout(() => setupHeaderCheckbox(), 0)
 }
 
 /**
@@ -299,6 +371,145 @@ function ellipsisRenderer(
 }
 
 /**
+ * Update the header checkbox state (checked / indeterminate) based on row data
+ */
+function updateHeaderCheckboxState() {
+  if (!hot) return
+  const cbs = Array.from(document.querySelectorAll('.header-confirmed')) as HTMLInputElement[]
+  if (!cbs || cbs.length === 0) return
+
+  const data = hot.getSourceData() as PdfDataRow[]
+  if (!data || data.length === 0) {
+    cbs.forEach(cb => {
+      cb.checked = false
+      cb.indeterminate = false
+    })
+    return
+  }
+
+  const confirmedCount = data.reduce((acc, r) => acc + (r.confirmed ? 1 : 0), 0)
+  if (confirmedCount === 0) {
+    cbs.forEach(cb => { cb.checked = false; cb.indeterminate = false })
+  } else if (confirmedCount === data.length) {
+    cbs.forEach(cb => { cb.checked = true; cb.indeterminate = false })
+  } else {
+    cbs.forEach(cb => { cb.checked = false; cb.indeterminate = true })
+  }
+}
+
+/**
+ * Apply or remove the confirmed-row class for all cells in a given row
+ */
+function applyRowConfirmedClass(row: number, confirmed: boolean) {
+  if (!hot) return
+  const colCount = hot.countCols()
+  for (let col = 0; col < colCount; col++) {
+    try {
+      const meta = (hot as any).getCellMeta(row, col) || {}
+      const existing = String(meta.className || '').split(/\s+/).filter(Boolean)
+
+      if (confirmed) {
+        if (!existing.includes('confirmed-row')) existing.push('confirmed-row')
+      } else {
+        // remove confirmed-row but keep other classes
+        const idx = existing.indexOf('confirmed-row')
+        if (idx >= 0) existing.splice(idx, 1)
+      }
+
+      if (existing.length > 0) {
+        (hot as any).setCellMeta(row, col, 'className', existing.join(' '))
+      } else {
+        (hot as any).setCellMeta(row, col, 'className', undefined)
+      }
+    } catch (e) {
+      // ignore out-of-range errors during init
+    }
+  }
+}
+
+/**
+ * Injects a checkbox into the header cell at index 1 and wires its behaviour
+ */
+function setupHeaderCheckbox() {
+  if (!hot) return
+  const container = document.querySelector('#data-grid') as HTMLElement | null
+  if (!container) return
+
+  // Handsontable renders header clones; attempt to find both top and master header cells
+  const selectors = [
+    '.ht_clone_top .htCore thead th:nth-child(1)',
+    '.ht_master .htCore thead th:nth-child(1)',
+    '#data-grid thead th:nth-child(1)'
+  ]
+
+  const headerCells: HTMLElement[] = []
+  for (const s of selectors) {
+    const el = container.querySelector(s) as HTMLElement | null
+    if (el && !headerCells.includes(el)) headerCells.push(el)
+  }
+
+  if (headerCells.length === 0) {
+    // header not ready yet — try again on next frame
+    requestAnimationFrame(setupHeaderCheckbox)
+    return
+  }
+
+  // Inject a separate checkbox into each found header cell (keep them in sync via updateHeaderCheckboxState)
+  headerCells.forEach(th => {
+    // Avoid re-injecting
+    if (th.querySelector('.header-confirmed')) return
+
+    // Preserve header text and insert checkbox aligned to the right
+    // Avoid re-injecting if header already contains our wrapper
+    if (th.querySelector('.header-content')) return
+
+    const existingText = th.textContent ? th.textContent.trim() : ''
+    th.innerHTML = ''
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'header-content'
+    wrapper.style.display = 'flex'
+    wrapper.style.justifyContent = 'space-between'
+    wrapper.style.alignItems = 'center'
+    wrapper.style.width = '100%'
+
+    const span = document.createElement('span')
+    span.className = 'header-text'
+    span.textContent = existingText
+    wrapper.appendChild(span)
+
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.className = 'header-confirmed'
+    checkbox.title = 'Alle bestätigen'
+    checkbox.setAttribute('aria-label', 'Alle bestätigen')
+
+    checkbox.addEventListener('change', () => {
+      const checked = checkbox.checked
+      const data = hot!.getSourceData() as PdfDataRow[]
+      for (let i = 0; i < data.length; i++) {
+        hot!.setDataAtRowProp(i, 'confirmed', checked)
+        // apply or remove visual class for each row
+        applyRowConfirmedClass(i, checked)
+      }
+      // Re-render so cells() is re-evaluated and classes are applied
+      hot!.render()
+      updateHeaderCheckboxState()
+    })
+
+    wrapper.appendChild(checkbox)
+    th.appendChild(wrapper)
+  })
+
+  updateHeaderCheckboxState()
+}
+
+/**
+ * Show an expanded view of a cell's content in a simple modal overlay
+ */
+// Note: expanded-cell modal removed — context menu is disabled in favor of Ctrl+C and fill-handle
+
+/**
  * Handsontable instance for data grid
  */
 let hot: Handsontable | null = null
@@ -316,9 +527,59 @@ document.addEventListener('DOMContentLoaded', () => {
     className: 'htEllipsis',
     renderer: ellipsisRenderer,
     columns: getColumnConfig(currentMode),
+    // Restrict features: only editing, copy and expand via context menu
+    // Disable many interactive features to keep table minimal
+    copyPaste: true,
+    allowInsertRow: false,
+    allowInsertColumn: false,
+    allowRemoveRow: false,
+    allowRemoveColumn: false,
+    manualColumnMove: false,
+    manualRowMove: false,
+    manualColumnResize: false,
+    manualRowResize: false,
+    dropdownMenu: false,
+    filters: false,
+    columnSorting: false,
+    // Disable right-click context menu; keep copy/paste and fill-handle
+    contextMenu: false,
+    fillHandle: true,
+    // Cells callback kept minimal to avoid overwriting className meta set via setCellMeta
+    cells() {
+      return {}
+    },
+    // Ensure header checkbox is present after each render
+    afterRender() {
+      setupHeaderCheckbox()
+    },
+    // Keep header checkbox in sync when checkboxes change
+    afterChange(changes, _source) {
+      if (!changes) return
+      for (const c of changes) {
+        const prop = c[1]
+        if (prop === 'confirmed') {
+          const rowIndex = c[0] as number
+          const newVal = c[3] as boolean
+          // Apply or remove class for this specific row
+          applyRowConfirmedClass(rowIndex, Boolean(newVal))
+          // Ensure visual classes are updated after a confirmed change
+          if (hot) hot.render()
+          updateHeaderCheckboxState()
+          break
+        }
+      }
+    },
 
-    async afterOnCellMouseDown(_event, coords) {
+    async afterOnCellMouseDown(event, coords) {
       if (coords.col === 0 && hot) {
+        // Only open the PDF when the user clicks the filename text itself.
+        // Ignore clicks on the checkbox or other parts of the cell.
+        const target = event && (event.target as HTMLElement | null)
+        if (target) {
+          // If click was not on the filename span, bail out
+          if (!target.closest('.pdf-cell-text')) return
+        }
+
         const rowData = hot.getSourceDataAtRow(coords.row) as PdfDataRow
         if (rowData && rowData.fullPath) {
           await openPath(rowData.fullPath)
@@ -334,6 +595,13 @@ document.addEventListener('DOMContentLoaded', () => {
     licenseKey: 'non-commercial-and-evaluation'
   })
 
+  // Prevent the native browser context menu inside the table container
+  // Handsontable's built-in contextMenu option is disabled, but some
+  // browsers may still show the native menu — block it explicitly.
+  container.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+  })
+
   // Update Handsontable theme when global theme changes
   const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
   if (themeToggle) {
@@ -346,6 +614,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     })
   }
+
+  // Inject header checkbox once the table is rendered
+  requestAnimationFrame(() => setupHeaderCheckbox())
 })
 
 /**

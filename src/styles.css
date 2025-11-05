@@ -107,6 +107,29 @@ h1 {
   flex: 1;
 }
 
+/* Header checkbox wrapper for first column */
+.handsontable .htCore th .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.handsontable .htCore th .header-text {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.handsontable .htCore th .header-confirmed {
+  margin: 0;
+}
+
 .header-center {
   flex-shrink: 0;
 }
@@ -322,4 +345,70 @@ h1 {
 [data-theme="dark"] .handsontable .ht_master .wtBorder,
 [data-theme="dark"] .handsontable .wtHolder .wtBorder {
   border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Confirmed row styling */
+.confirmed-row {
+  /* light, subtle green background for confirmed rows */
+  background-color: #d8ffe5 !important;
+}
+
+[data-theme="dark"] .confirmed-row {
+  /* darker green tint in dark mode */
+  background-color: #313e31 !important;
+}
+
+.handsontable .htCore td.confirmed-row,
+.handsontable .htCore td.confirmed-row .wtHolder {
+  /* light, subtle green background for confirmed rows (apply to cell) */
+  background-color: #d8ffe5 !important;
+}
+
+[data-theme="dark"] .handsontable .htCore td.confirmed-row,
+[data-theme="dark"] .handsontable .htCore td.confirmed-row .wtHolder {
+  /* darker green tint in dark mode */
+  background-color: #313e31 !important;
+  color: #e6f9ec !important;
+}
+
+/* Ensure checkbox column cells keep no-wrap and center their content */
+.handsontable .htCore td.htCenter {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+.handsontable .htCore td.htCenter input[type="checkbox"] {
+  margin: 0 !important;
+  vertical-align: middle !important;
+}
+
+/* PDF cell with embedded checkbox: text left (ellipsis) and checkbox right */
+.handsontable .htCore td.pdf-with-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-right: 0.5rem !important;
+  white-space: nowrap !important;
+}
+
+.pdf-cell-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.pdf-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.row-confirm-checkbox {
+  margin: 0;
+  flex: 0 0 auto;
 }
