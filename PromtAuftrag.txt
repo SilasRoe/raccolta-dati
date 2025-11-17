@@ -4,8 +4,6 @@ AUFGABE: Extrahiere alle relevanten Informationen einer Auftragsbescheinigung au
 
 ERWARTETES JSON-SCHEMA (Pflichtfelder wenn vorhanden, sonst null / leeres Array):
 {
-  "pdfName": string | null,          // Dateiname, falls verfügbar
-  "fullPath": string | null,         // optionaler Pfad, falls verfügbar
   "datumAuftrag": string | null,     // Datum des Auftrags im ISO-Format "YYYY-MM-DD"
   "nummerAuftrag": string | null,    // Auftragsnummer (als String)
   "kunde": string | null,            // Name/Adresse des Kunden (falls vorhanden)

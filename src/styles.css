@@ -59,6 +59,11 @@ body {
   box-sizing: border-box;
 }
 
+button:disabled {
+  opacity: 0.5;
+  cursor: auto;
+}
+
 .file-button {
   border-radius: 8px;
   padding: 0.25em 0.5em;

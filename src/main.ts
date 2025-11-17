@@ -1,29 +1,11 @@
-/**
- * Main application file for the PDF data management tool.
- * This file handles PDF file selection, folder browsing, and data table management.
- *
- * Key Features:
- * - PDF file selection via file dialog
- * - Folder browsing with PDF filtering
- * - Interactive data table with Handsontable
- * - PDF file opening functionality
- *
- * Dependencies:
- * - @tauri-apps/plugin-dialog for file/folder selection
- * - @tauri-apps/plugin-fs for filesystem operations
- * - @tauri-apps/api/path for path manipulation
- * - @tauri-apps/plugin-opener for opening files
- * - Handsontable for data grid functionality
- */
-
 import { open } from '@tauri-apps/plugin-dialog'
 import { readDir } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import Handsontable from 'handsontable'
-import { openPath } from '@tauri-apps/plugin-opener';
+import { openPath } from '@tauri-apps/plugin-opener'
 
-import 'handsontable/styles/handsontable.min.css';
-import 'handsontable/styles/ht-theme-main.min.css';
+import 'handsontable/styles/handsontable.min.css'
+import 'handsontable/styles/ht-theme-main.min.css'
 
 /**
  * Interface representing a row of PDF data in the table
@@ -70,26 +52,73 @@ let selectedPdfPaths: string[] = []
  * Initialize event listeners when DOM content is loaded
  */
 document.addEventListener('DOMContentLoaded', () => {
-  const selectFilesBtn = document.querySelector('#select-files-btn')
-  const selectFolderBtn = document.querySelector('#select-folder-btn')
-  const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
+  const startProcessBtn = document.querySelector('#start-process-btn') as HTMLButtonElement;
+  if (startProcessBtn) {
+    startProcessBtn.addEventListener('click', handleStartProcess);
+  }
+
+  function handleStartProcess() {
+
+  }
+
+  function updateStartProcessButtonState() {
+    const startProcessBtn = document.querySelector('#start-process-btn') as HTMLButtonElement;
+    if (startProcessBtn) {
+      const isTableFilled = document.querySelector('#data-grid table tbody tr td:first-child') !== null;
+      startProcessBtn.disabled = !isTableFilled;
+    }
+  }
+
+  // Call the function to set the initial state of the button
+  updateStartProcessButtonState();
+
+  // Add event listener to update the button state when the table content changes
+  const dataGrid = document.querySelector('#data-grid') as HTMLElement;
+  const observer = new MutationObserver(() => {
+    updateStartProcessButtonState();
+  });
+  observer.observe(dataGrid, { childList: true, subtree: true });
+
+  const selectFilesBtn = document.querySelector('#select-files-btn') as HTMLButtonElement;
+  const selectFolderBtn = document.querySelector('#select-folder-btn') as HTMLButtonElement;
+  const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement;
 
   if (selectFilesBtn) {
-    selectFilesBtn.addEventListener('click', handleSelectFiles)
+    selectFilesBtn.addEventListener('click', handleSelectFiles);
   }
   if (selectFolderBtn) {
-    selectFolderBtn.addEventListener('click', handleSelectFolder)
+    selectFolderBtn.addEventListener('click', handleSelectFolder);
   }
 
   if (themeToggle) {
     // Improve accessibility and ensure the visual switch styles are in sync
-    themeToggle.setAttribute('role', 'switch')
-    themeToggle.setAttribute('aria-checked', String(themeToggle.checked))
-    themeToggle.addEventListener('change', toggleTheme)
+    themeToggle.setAttribute('role', 'switch');
+    themeToggle.setAttribute('aria-checked', String(themeToggle.checked));
+    themeToggle.addEventListener('change', toggleTheme);
     // Ensure the UI and document theme reflect the current toggle state on load
-    toggleTheme()
+    toggleTheme();
   }
-})
+});
+
+const selectFilesBtn = document.querySelector('#select-files-btn')
+const selectFolderBtn = document.querySelector('#select-folder-btn')
+const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
+
+if (selectFilesBtn) {
+  selectFilesBtn.addEventListener('click', handleSelectFiles)
+}
+if (selectFolderBtn) {
+  selectFolderBtn.addEventListener('click', handleSelectFolder)
+}
+
+if (themeToggle) {
+  // Improve accessibility and ensure the visual switch styles are in sync
+  themeToggle.setAttribute('role', 'switch')
+  themeToggle.setAttribute('aria-checked', String(themeToggle.checked))
+  themeToggle.addEventListener('change', toggleTheme)
+  // Ensure the UI and document theme reflect the current toggle state on load
+  toggleTheme()
+}
 
 /**
  * Handle PDF file selection via file dialog
@@ -112,7 +141,7 @@ async function handleSelectFiles() {
     selectedPdfPaths = []
   }
 
-  updateFileUI()
+  updateFileUIAufträge()
 }
 
 /**
@@ -146,13 +175,24 @@ async function handleSelectFolder() {
     selectedPdfPaths = []
   }
 
-  updateFileUI()
+  updateFileUIAufträge()
+}
+
+function parseDateStrings(dateString: string) {
+  let date
+  if (dateString && dateString.length === 8) {
+    const year = dateString.substring(0, 4)
+    const month = dateString.substring(4, 6)
+    const day = dateString.substring(6, 8)
+    date = `${day}.${month}.${year}`
+  }
+  return date || null
 }
 
 /**
  * Update the file UI with selected PDF data
  */
-function updateFileUI() {
+function updateFileUIAufträge() {
   if (!hot) return
 
   const tableData: PdfDataRow[] = selectedPdfPaths.map(path => {
@@ -160,13 +200,21 @@ function updateFileUI() {
       path.lastIndexOf('/'),
       path.lastIndexOf('\\')
     )
-    const fileName = path.substring(lastSeparatorIndex + 1)
+    const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0]
+    const datumAuftrag = parseDateStrings(fileName.split('_')[1])
+    const nummerAuftrag = fileName.split('_')[0] || null
+    const kunde = fileName.split('_')[2].split('-')[1] || null
+    const lieferant = fileName.split('_')[2].split('-')[0] || null
 
     return {
       pdfName: fileName,
-      fullPath: path
-      , confirmed: false
-      , anmerkungen: ''
+      fullPath: path,
+      datumAuftrag: datumAuftrag,
+      nummerAuftrag: nummerAuftrag,
+      kunde: kunde,
+      lieferant: lieferant,
+      confirmed: false,
+      anmerkungen: ''
     }
   })
 
@@ -308,7 +356,7 @@ function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
   if (mode === 'auftraege') {
     return [
       { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
-      { data: 'datumAuftrag', type: 'date', dateFormat: 'YYYY-MM-DD' },
+      { data: 'datumAuftrag', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
       { data: 'nummerAuftrag' },
       { data: 'kunde' },
       { data: 'lieferant' },
@@ -321,7 +369,7 @@ function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
   } else {
     return [
       { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
-      { data: 'datumRechnung', type: 'date', dateFormat: 'YYYY-MM-DD' },
+      { data: 'datumRechnung', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
       { data: 'nummerRechnung' },
       { data: 'gelieferteMenge', type: 'numeric' },
       { data: 'anmerkungen', type: 'text' }
@@ -640,9 +688,9 @@ function toggleTheme() {
   }
 
   // If Handsontable is already initialized, update its theme immediately
-  if (hot) {
+  /*if (hot) {
     hot.updateSettings({
       themeName: isChecked ? 'ht-theme-main-light-auto' : 'ht-theme-main-dark-auto'
     })
-  }
+  }*/
 }
