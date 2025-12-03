@@ -3,6 +3,7 @@ import { readDir } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import Handsontable from 'handsontable'
 import { openPath } from '@tauri-apps/plugin-opener'
+import { invoke } from '@tauri-apps/api/core'
 
 import 'handsontable/styles/handsontable.min.css'
 import 'handsontable/styles/ht-theme-main.min.css'
@@ -31,6 +32,12 @@ interface PdfDataRow {
   anmerkungen?: string | null
   // Bestätigungsflag für die gesamte Zeile
   confirmed?: boolean | null
+}
+interface AiResponse {
+  produkt?: string | null
+  menge?: number | null
+  waehrung?: string | null
+  preis?: number | null
 }
 
 /**
@@ -81,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const selectFilesBtn = document.querySelector('#select-files-btn') as HTMLButtonElement;
   const selectFolderBtn = document.querySelector('#select-folder-btn') as HTMLButtonElement;
+  const startResearchBtn = document.querySelector('#start-process-btn') as HTMLButtonElement;
   const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement;
 
   if (selectFilesBtn) {
@@ -88,6 +96,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (selectFolderBtn) {
     selectFolderBtn.addEventListener('click', handleSelectFolder);
+  }
+  if (startResearchBtn) {
+    startResearchBtn.addEventListener('click', () => handleReseachStart('asdf'));
   }
 
   if (themeToggle) {
@@ -176,6 +187,20 @@ async function handleSelectFolder() {
   }
 
   updateFileUIAufträge()
+}
+
+async function handleReseachStart(prompt: String) {
+  try {
+    // Ruft die Rust-Funktion 'ask_mistral' auf
+    const result = await invoke<AiResponse>('ask_mistral', {
+      prompt: prompt
+    })
+
+    console.log('Antwort aus Rust:', result)
+
+  } catch (error) {
+    console.error('Fehler im Backend:', error)
+  }
 }
 
 function parseDateStrings(dateString: string) {
