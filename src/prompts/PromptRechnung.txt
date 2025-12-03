@@ -1,56 +1,36 @@
-EINGABE: Du bekommst als INPUT eine einzige Zeichenkette mit dem vollständigen HTML-Inhalt einer PDF (PDF wurde in HTML umgewandelt). Optional kann zusätzlich "fileName" oder "filePath" übergeben werden.
+EINGABE: Du bekommst als INPUT eine einzige Zeichenkette mit dem vollständigen Markdown-Inhalt einer PDF (PDF wurde in Markdown umgewandelt).
 
-AUFGABE: Extrahiere alle relevanten Informationen einer Rechnung aus dem HTML und liefere exakt ein einziges gültiges JSON-Objekt als einzige Ausgabe. Keine Erklärungen, keine zusätzlichen Texte, nur JSON.
+AUFGABE: Extrahiere alle relevanten Informationen einer Rechnung aus dem Markdown und liefere exakt ein einziges gültiges JSON-Objekt als einzige Ausgabe. Keine Erklärungen, keine zusätzlichen Texte, nur JSON.
 
 ERWARTETES JSON-SCHEMA:
 {
-  "pdfName": string | null,           // Dateiname, falls vorhanden
-  "fullPath": string | null,          // optionaler Pfad
-  "datumRechnung": string | null,     // Rechnungsdatum im ISO-Format "YYYY-MM-DD"
-  "nummerRechnung": string | null,    // Rechnungsnummer (als String)
-  "rechnungssteller": string | null,  // wer die Rechnung ausstellt / Casa Rapp. / Lieferant (falls vorhanden)
-  "rechnungsEmpfaenger": string | null,// Rechnungsempfänger / Kunde (falls vorhanden)
-  "produkte": [                       // Array mit gelieferten/abgerechneten Positionen (kann leer sein)
+  "produkte": [                         // Array mit gelieferten/abgerechneten Positionen (kann leer sein)
     {
       "produkt": string | null,
-      "gelieferteMenge": number | null,  // Zahl (kein Text), Einheit wenn möglich getrennt
-      "mengeEinheit": string | null,     // z. B. "kg", "pz"
-      "preisEinheit": number | null,     // Einzelpreis (ohne Währungssymbol)
-      "waehrung": string | null,         // Währung als ISO-Code oder Symbol
-      "gesamtpreis": number | null       // Gesamtpreis für die Position
+      "gelieferteMenge": number | null  // Zahl (kein Text), ohne Einheit
     }
   ],
-  "gesamtMenge": number | null         // optional aggregierte gelieferte Menge (wenn klar ersichtlich)
+  "nummerRechnung": string | null
 }
 
 FORMAT- UND NORMALISIERUNGSREGELN:
-- Datum: ISO YYYY-MM-DD. Fehlend => null.
 - Zahlen: JSON-Zahlen, Dezimalpunkt, keine Tausendertrennzeichen.
-- Währung: ISO-Code bevorzugt, sonst Symbol.
-- Produkte: wenn keine Positionen erkennbar, "produkte": [].
+- Produkte: wenn keine Produkte erkennbar, "produkte": [].
 - Felder, nicht gefunden => null.
 - Wenn mehrere mögliche Rechnungsnummern/Daten vorhanden sind, wähle diejenige, die klar als "Fattura", "Invoice", "Rechnung" o. ä. gekennzeichnet ist.
 - Ausgabe darf nur die Felder aus diesem Schema enthalten — keine zusätzlichen Felder.
 
 BEISPIEL-AUSGABE:
 {
-  "pdfName":"rechnung-456.pdf",
-  "fullPath":"/pfad/rechnung-456.pdf",
-  "datumRechnung":"2025-10-28",
-  "nummerRechnung":"INV-456/2025",
-  "rechnungssteller":"Casa Rapp. ABC",
-  "rechnungsEmpfaenger":"Firma XYZ GmbH",
   "produkte":[
     {
       "produkt":"Produkt A",
-      "gelieferteMenge":1000,
-      "mengeEinheit":"kg",
-      "preisEinheit":1.30,
-      "waehrung":"EUR",
-      "gesamtpreis":1300.00
+      "gelieferteMenge":1000
     }
   ],
-  "gesamtMenge":1000
+  "nummerRechnung": "CT123412"
 }
 
 WICHTIG: Rückgabe = ausschließlich ein JSON-Objekt, perfekt parsebar. Keine sonstigen Ausgaben.
+
+EINGABE:

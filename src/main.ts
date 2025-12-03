@@ -5,58 +5,45 @@ import Handsontable from 'handsontable'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { invoke } from '@tauri-apps/api/core'
 
-import promptAuftrag from "./prompts/PromptAuftrag.txt?raw"
-import promptRechnung from "./prompts/PromptRechnung.txt?raw"
-
 import 'handsontable/styles/handsontable.min.css'
 import 'handsontable/styles/ht-theme-main.min.css'
 
-/**
- * Interface representing a row of PDF data in the table
- * Contains all possible fields for both Aufträge and Rechnungen modes
- */
+/** Interface für einen Datensatz der Handsontable */
 interface PdfDataRow {
+  id: number
   pdfName: string
   fullPath: string
-  // Aufträge fields
-  datumAuftrag?: string | null
-  nummerAuftrag?: string | null
+  docType: 'auftrag' | 'rechnung'
+  confirmed: boolean
+
   kunde?: string | null
   lieferant?: string | null
+  datumAuftrag?: string | null
+  nummerAuftrag?: string | null
+
   produkt?: string | null
   menge?: number | null
-  waehrung?: string | null
+  einheit?: string | null
   preis?: number | null
-  // Rechnungen fields
+  waehrung?: string | null
+
   datumRechnung?: string | null
   nummerRechnung?: string | null
   gelieferteMenge?: number | null
-  // Freitext für Anmerkungen
+
   anmerkungen?: string | null
-  // Bestätigungsflag für die gesamte Zeile
-  confirmed?: boolean | null
 }
 interface AiProduct {
   produkt?: string | null
   menge?: number | null
   waehrung?: string | null
   preis?: number | null
-  // Ggf. weitere Felder aus Rechnungs-Prompt ergänzen
+  nummerRechnung?: string | null
   gelieferteMenge?: number | null
 }
 interface AiResponse {
   produkte?: AiProduct[]
 }
-
-/**
- * Type definition for available modes
- */
-type AppMode = 'auftraege' | 'rechnungen'
-
-/**
- * Current active mode
- */
-let currentMode: AppMode = 'auftraege'
 
 /**
  * Array storing paths of selected PDF files
@@ -108,10 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
     selectFolderBtn.addEventListener('click', handleSelectFolder);
   }
   if (startResearchBtn) {
-    const prompt = currentMode === 'auftraege' ? promptAuftrag : promptRechnung
     controller = new AbortController()
     const signal = controller.signal
-    startResearchBtn.addEventListener('click', () => { handleReseachStart(prompt) }, { signal: signal })
+    startResearchBtn.addEventListener('click', () => { handleReseachStart() }, { signal: signal })
   }
 
   if (themeToggle) {
@@ -202,7 +188,7 @@ async function handleSelectFolder() {
   updateFileUIAufträge()
 }
 
-async function handleReseachStart(basePrompt: string) {
+async function handleReseachStart() {
   if (!hot) return
 
   const startBtn = document.querySelector('#start-process-btn') as HTMLButtonElement
@@ -210,46 +196,37 @@ async function handleReseachStart(basePrompt: string) {
   document.body.style.cursor = 'wait'
 
   try {
-    const originalData = hot.getSourceData() as PdfDataRow[]
+    const data = hot.getSourceData() as PdfDataRow[]
 
-    const preparationTasks = originalData.map(async (row) => {
+    const aiResults = await Promise.all(data.map(async (row, index) => {
       if (!row.fullPath) return null
+
       try {
-        const markdown = await invoke<string>('pdf_to_markdown', {
-          path: row.fullPath
+        hot!.setDataAtRowProp(index, 'status', 'Lädt...')
+
+        const result = await invoke<AiResponse>('analyze_document', {
+          path: row.fullPath,
+          docType: row.docType
         })
-        return markdown
+
+        console.log(result)
+
+        const docType = row.docType
+        return { index, row, docType, result }
       } catch (err) {
-        console.error(`Fehler bei PDF-Konvertierung (${row.pdfName}):`, err)
+        console.error(err)
+        hot!.setDataAtRowProp(index, 'status', 'Fehler')
+        hot!.setDataAtRowProp(index, 'anmerkungen', String(err))
         return null
       }
-    })
-
-    const markdownDocuments = await Promise.all(preparationTasks)
-
-    const aiTasks = markdownDocuments.map(async (markdown) => {
-      if (!markdown) return null
-
-      const fullPrompt = `${basePrompt}\n${markdown}`
-
-      try {
-        const response = await invoke<AiResponse>('ask_mistral', {
-          prompt: fullPrompt
-        })
-        return response
-      } catch (error) {
-        console.error('Fehler bei KI-Anfrage:', error)
-        return null
-      }
-    })
-
-    const aiResults = await Promise.all(aiTasks)
+    }))
 
     const newTableData: PdfDataRow[] = []
 
-    originalData.forEach((row, index) => {
-      const aiResult = aiResults[index]
+    data.forEach((row, index) => {
+      const aiResult = aiResults[index]?.result
       const products = aiResult?.produkte
+      const docType = aiResults[index]?.docType
 
       if (products && Array.isArray(products) && products.length > 0) {
         products.forEach((prod, prodIndex) => {
@@ -263,19 +240,20 @@ async function handleReseachStart(basePrompt: string) {
 
           newRow.produkt = prod.produkt
 
-          if (currentMode === 'auftraege') {
+          if (docType === 'auftrag') {
             newRow.menge = prod.menge
             newRow.waehrung = prod.waehrung
             newRow.preis = prod.preis
           } else {
-            newRow.gelieferteMenge = prod.gelieferteMenge ?? prod.menge
+            newRow.gelieferteMenge = prod.gelieferteMenge
+            newRow.nummerRechnung = prod.nummerRechnung
           }
 
           newTableData.push(newRow)
         })
       } else {
         const errorRow = { ...row }
-        if (!markdownDocuments[index]) {
+        if (!aiResults[index]) {
           errorRow.anmerkungen = 'Fehler: PDF konnte nicht gelesen werden.'
         } else if (!aiResult) {
           errorRow.anmerkungen = 'Fehler: KI hat nicht geantwortet.'
@@ -314,104 +292,61 @@ function parseDateStrings(dateString: string) {
 function updateFileUIAufträge() {
   if (!hot) return
 
-  const tableData: PdfDataRow[] = selectedPdfPaths.map(path => {
-    const lastSeparatorIndex = Math.max(
-      path.lastIndexOf('/'),
-      path.lastIndexOf('\\')
-    )
-    const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0]
-    const datumAuftrag = parseDateStrings(fileName.split('_')[1])
-    const nummerAuftrag = fileName.split('_')[0] || null
-    const kunde = fileName.split('_')[2].split('-')[1] || null
-    const lieferant = fileName.split('_')[2].split('-')[0] || null
+  const currentData = hot?.getSourceData() as PdfDataRow[]
+  const existingPaths = new Set(currentData.map(row => row.fullPath).filter(Boolean))
+  let nextId = currentData.length > 0 ? Math.max(...currentData.map(r => r.id || 0)) + 1 : 1
 
-    return {
-      pdfName: fileName,
-      fullPath: path,
-      datumAuftrag: datumAuftrag,
-      nummerAuftrag: nummerAuftrag,
-      kunde: kunde,
-      lieferant: lieferant,
-      confirmed: false,
-      anmerkungen: ''
+  const newPaths = selectedPdfPaths.filter(path => !existingPaths.has(path))
+
+  const newRows = newPaths.map((path): PdfDataRow | null => {
+    try {
+      const lastSeparatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+      const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0]
+
+      const isInvoice = fileName.toUpperCase().startsWith('FT_')
+      const docType = isInvoice ? 'rechnung' : 'auftrag'
+
+      let datumRechnung, datumAuftrag, nummerAuftrag, kunde, lieferant
+
+      if (isInvoice) {
+        datumRechnung = parseDateStrings(fileName.split('_')[2].split('-')[0])
+        nummerAuftrag = fileName.split('_')[3] || null
+        kunde = fileName.split('_')[2].split('-')[1] || null
+        lieferant = fileName.split('_')[1] || null
+      } else {
+        datumAuftrag = parseDateStrings(fileName.split('_')[1])
+        nummerAuftrag = fileName.split('_')[0] || null
+        kunde = fileName.split('_')[2].split('-')[1] || null
+        lieferant = fileName.split('_')[2].split('-')[0] || null
+      }
+
+      return {
+        id: nextId++,
+        pdfName: fileName,
+        fullPath: path,
+        docType: docType,
+        confirmed: false,
+        kunde: kunde,
+        lieferant: lieferant,
+        datumAuftrag: datumAuftrag || null,
+        nummerAuftrag: nummerAuftrag,
+        datumRechnung: datumRechnung || null
+      } as PdfDataRow
+
+    } catch (e) {
+      console.error(`Fehler beim Parsen von ${path}:`, e)
+      return null
     }
-  })
+  }).filter((row): row is PdfDataRow => row !== null)
+
+  // 4. Zusammenfügen
+  let tableData: PdfDataRow[] = currentData.concat(newRows)
 
   hot.loadData(tableData)
-  // Ensure header checkbox state is correct after loading new data
   updateHeaderCheckboxState()
-  // Apply row classes for any pre-confirmed rows
   const current = hot.getSourceData() as PdfDataRow[]
   for (let i = 0; i < current.length; i++) {
     applyRowConfirmedClass(i, Boolean(current[i].confirmed))
-  }
-}
-
-/**
- * Initialize navigation button event listeners
- */
-document.addEventListener('DOMContentLoaded', () => {
-  const nav = document.querySelector('.sliding-nav') as HTMLElement
-  const buttons = Array.from(
-    nav.querySelectorAll('button')
-  ) as HTMLElement[]
-
-  if (!nav) return
-
-  function updateUnderlinePosition() {
-    const activeButton = nav.querySelector('button.active') as HTMLElement
-    if (!activeButton) return
-
-    const left = activeButton.offsetLeft
-    const width = activeButton.offsetWidth
-
-    nav.style.setProperty('--underline-left', `${left}px`)
-    nav.style.setProperty('--underline-width', `${width}px`)
-  }
-
-  buttons.forEach((button, index) => {
-    button.addEventListener('click', () => {
-      buttons.forEach(btn => btn.classList.remove('active'))
-      button.classList.add('active')
-      updateUnderlinePosition()
-
-      // Switch mode based on button index
-      const newMode: AppMode = index === 0 ? 'auftraege' : 'rechnungen'
-      if (currentMode !== newMode) {
-        currentMode = newMode
-        updateTableConfiguration()
-      }
-    })
-  })
-
-  updateUnderlinePosition()
-})
-
-/**
- * Get column headers based on current mode
- */
-function getColumnHeaders(mode: AppMode): string[] {
-  if (mode === 'auftraege') {
-    return [
-      'File PDF',
-      "Data",
-      'N°',
-      'Cliente',
-      'Casa Estera',
-      'Prodotto',
-      'kg/pz.',
-      'Val.',
-      'Prezzo kg/z.',
-      'Note'
-    ]
-  } else {
-    return [
-      'File PDF',
-      'Data fattura Casa rapp.',
-      'N° fattura Casa rapp.',
-      'kg/pz.',
-      'Note'
-    ]
   }
 }
 
@@ -466,64 +401,6 @@ function pdfNameRenderer(
 
   wrapper.appendChild(checkbox)
   td.appendChild(wrapper)
-}
-
-/**
- * Get column configuration based on current mode
- */
-function getColumnConfig(mode: AppMode): Handsontable.ColumnSettings[] {
-  if (mode === 'auftraege') {
-    return [
-      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
-      { data: 'datumAuftrag', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
-      { data: 'nummerAuftrag' },
-      { data: 'kunde' },
-      { data: 'lieferant' },
-      { data: 'produkt' },
-      { data: 'menge', type: 'numeric' },
-      { data: 'waehrung' },
-      { data: 'preis', type: 'numeric', numericFormat: { pattern: '0.00 €' } },
-      { data: 'anmerkungen', type: 'text' }
-    ]
-  } else {
-    return [
-      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
-      { data: 'datumRechnung', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
-      { data: 'nummerRechnung' },
-      { data: 'gelieferteMenge', type: 'numeric' },
-      { data: 'anmerkungen', type: 'text' }
-    ]
-  }
-}
-
-/**
- * Update table configuration based on current mode
- */
-function updateTableConfiguration() {
-  if (!hot) return
-
-  const currentData = hot.getSourceData() as PdfDataRow[]
-
-  hot.updateSettings({
-    colHeaders: getColumnHeaders(currentMode),
-    columns: getColumnConfig(currentMode)
-  })
-
-  // Reload data to ensure all rows are properly formatted
-  if (currentData.length > 0) {
-    hot.loadData(currentData)
-  }
-  // Re-inject header checkbox after settings change (header DOM may be re-rendered)
-  setTimeout(() => setupHeaderCheckbox(), 0)
-
-  const startResearchBtn = document.querySelector('#start-process-btn') as HTMLButtonElement
-  if (startResearchBtn) {
-    const prompt = currentMode === 'auftraege' ? promptAuftrag : promptRechnung
-    controller?.abort()
-    controller = new AbortController()
-    const signal = controller.signal
-    startResearchBtn.addEventListener('click', () => { handleReseachStart(prompt) }, { signal: signal })
-  }
 }
 
 /**
@@ -699,12 +576,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   hot = new Handsontable(container, {
     data: [],
-    colHeaders: getColumnHeaders(currentMode),
+    colHeaders: [
+      'File PDF',
+      "Data",
+      'N°',
+      'Cliente',
+      'Casa Estera',
+      'Prodotto',
+      'kg/pz.',
+      'Val.',
+      'Prezzo kg/z.',
+      'Data fattura Casa rapp.',
+      'N° fattura Casa rapp.',
+      'kg/pz.',
+      'Note'
+    ],
     className: 'htEllipsis',
     renderer: ellipsisRenderer,
-    columns: getColumnConfig(currentMode),
-    // Restrict features: only editing, copy and expand via context menu
-    // Disable many interactive features to keep table minimal
+    columns: [
+      { data: 'pdfName', readOnly: true, className: 'htEllipsis htLink pdf-with-checkbox', renderer: pdfNameRenderer },
+      { data: 'datumAuftrag', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
+      { data: 'nummerAuftrag' },
+      { data: 'kunde' },
+      { data: 'lieferant' },
+      { data: 'produkt' },
+      { data: 'menge', type: 'numeric' },
+      { data: 'waehrung' },
+      { data: 'preis', type: 'numeric', numericFormat: { pattern: '0.00 €' } },
+      { data: 'datumRechnung', type: 'date', dateFormat: 'DD.MM.YYYY', dateFormats: ['DD.MM.YYYY'], correctFormat: true },
+      { data: 'nummerRechnung' },
+      { data: 'gelieferteMenge', type: 'numeric' },
+      { data: 'anmerkungen', type: 'text' }
+    ],
     copyPaste: true,
     allowInsertRow: false,
     allowInsertColumn: false,
@@ -712,23 +615,19 @@ document.addEventListener('DOMContentLoaded', () => {
     allowRemoveColumn: false,
     manualColumnMove: false,
     manualRowMove: false,
-    manualColumnResize: false,
+    manualColumnResize: true,
     manualRowResize: false,
     dropdownMenu: false,
     filters: false,
     columnSorting: false,
-    // Disable right-click context menu; keep copy/paste and fill-handle
     contextMenu: false,
     fillHandle: true,
-    // Cells callback kept minimal to avoid overwriting className meta set via setCellMeta
     cells() {
       return {}
     },
-    // Ensure header checkbox is present after each render
     afterRender() {
       setupHeaderCheckbox()
     },
-    // Keep header checkbox in sync when checkboxes change
     afterChange(changes, _source) {
       if (!changes) return
       for (const c of changes) {
@@ -736,9 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (prop === 'confirmed') {
           const rowIndex = c[0] as number
           const newVal = c[3] as boolean
-          // Apply or remove class for this specific row
           applyRowConfirmedClass(rowIndex, Boolean(newVal))
-          // Ensure visual classes are updated after a confirmed change
           if (hot) hot.render()
           updateHeaderCheckboxState()
           break
@@ -748,11 +645,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async afterOnCellMouseDown(event, coords) {
       if (coords.col === 0 && hot) {
-        // Only open the PDF when the user clicks the filename text itself.
-        // Ignore clicks on the checkbox or other parts of the cell.
         const target = event && (event.target as HTMLElement | null)
         if (target) {
-          // If click was not on the filename span, bail out
           if (!target.closest('.pdf-cell-text')) return
         }
 
@@ -771,14 +665,10 @@ document.addEventListener('DOMContentLoaded', () => {
     licenseKey: 'non-commercial-and-evaluation'
   })
 
-  // Prevent the native browser context menu inside the table container
-  // Handsontable's built-in contextMenu option is disabled, but some
-  // browsers may still show the native menu — block it explicitly.
   container.addEventListener('contextmenu', (e) => {
     e.preventDefault()
   })
 
-  // Update Handsontable theme when global theme changes
   const themeToggle = document.querySelector('#theme-toggle-input') as HTMLInputElement
   if (themeToggle) {
     themeToggle.addEventListener('change', () => {
@@ -791,7 +681,6 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   }
 
-  // Inject header checkbox once the table is rendered
   requestAnimationFrame(() => setupHeaderCheckbox())
 })
 
@@ -806,19 +695,10 @@ function toggleTheme() {
   const isChecked = themeToggle.checked
   const theme = isChecked ? 'light' : 'dark'
 
-  // Apply theme to the document
   document.documentElement.setAttribute('data-theme', theme)
 
-  // Accessibility: keep ARIA attributes in sync
   themeToggle.setAttribute('aria-checked', String(isChecked))
   if (themeLabel) {
     themeLabel.setAttribute('aria-pressed', String(isChecked))
   }
-
-  // If Handsontable is already initialized, update its theme immediately
-  /*if (hot) {
-    hot.updateSettings({
-      themeName: isChecked ? 'ht-theme-main-light-auto' : 'ht-theme-main-dark-auto'
-    })
-  }*/
 }
