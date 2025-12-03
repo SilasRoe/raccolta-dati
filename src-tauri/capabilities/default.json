@@ -17,6 +17,15 @@
           "path": "**/*"
         }
       ]
+    },
+    "fs:allow-read-text-file",
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        {
+          "path": "$HOME/**"
+        }
+      ]
     }
   ]
 }

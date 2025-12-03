@@ -5,6 +5,9 @@ import Handsontable from 'handsontable'
 import { openPath } from '@tauri-apps/plugin-opener'
 import { invoke } from '@tauri-apps/api/core'
 
+import promptAuftrag from "./prompts/PromptAuftrag.txt?raw"
+import promptRechnung from "./prompts/PromptRechnung.txt?raw"
+
 import 'handsontable/styles/handsontable.min.css'
 import 'handsontable/styles/ht-theme-main.min.css'
 
@@ -33,11 +36,16 @@ interface PdfDataRow {
   // Bestätigungsflag für die gesamte Zeile
   confirmed?: boolean | null
 }
-interface AiResponse {
+interface AiProduct {
   produkt?: string | null
   menge?: number | null
   waehrung?: string | null
   preis?: number | null
+  // Ggf. weitere Felder aus Rechnungs-Prompt ergänzen
+  gelieferteMenge?: number | null
+}
+interface AiResponse {
+  produkte?: AiProduct[]
 }
 
 /**
@@ -54,6 +62,8 @@ let currentMode: AppMode = 'auftraege'
  * Array storing paths of selected PDF files
  */
 let selectedPdfPaths: string[] = []
+
+let controller: AbortController | null = null
 
 /**
  * Initialize event listeners when DOM content is loaded
@@ -98,7 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
     selectFolderBtn.addEventListener('click', handleSelectFolder);
   }
   if (startResearchBtn) {
-    startResearchBtn.addEventListener('click', () => handleReseachStart('asdf'));
+    const prompt = currentMode === 'auftraege' ? promptAuftrag : promptRechnung
+    controller = new AbortController()
+    const signal = controller.signal
+    startResearchBtn.addEventListener('click', () => { handleReseachStart(prompt) }, { signal: signal })
   }
 
   if (themeToggle) {
@@ -189,17 +202,98 @@ async function handleSelectFolder() {
   updateFileUIAufträge()
 }
 
-async function handleReseachStart(prompt: String) {
+async function handleReseachStart(basePrompt: string) {
+  if (!hot) return
+
+  const startBtn = document.querySelector('#start-process-btn') as HTMLButtonElement
+  if (startBtn) startBtn.disabled = true
+  document.body.style.cursor = 'wait'
+
   try {
-    // Ruft die Rust-Funktion 'ask_mistral' auf
-    const result = await invoke<AiResponse>('ask_mistral', {
-      prompt: prompt
+    const originalData = hot.getSourceData() as PdfDataRow[]
+
+    const preparationTasks = originalData.map(async (row) => {
+      if (!row.fullPath) return null
+      try {
+        const markdown = await invoke<string>('pdf_to_markdown', {
+          path: row.fullPath
+        })
+        return markdown
+      } catch (err) {
+        console.error(`Fehler bei PDF-Konvertierung (${row.pdfName}):`, err)
+        return null
+      }
     })
 
-    console.log('Antwort aus Rust:', result)
+    const markdownDocuments = await Promise.all(preparationTasks)
+
+    const aiTasks = markdownDocuments.map(async (markdown) => {
+      if (!markdown) return null
+
+      const fullPrompt = `${basePrompt}\n${markdown}`
+
+      try {
+        const response = await invoke<AiResponse>('ask_mistral', {
+          prompt: fullPrompt
+        })
+        return response
+      } catch (error) {
+        console.error('Fehler bei KI-Anfrage:', error)
+        return null
+      }
+    })
+
+    const aiResults = await Promise.all(aiTasks)
+
+    const newTableData: PdfDataRow[] = []
+
+    originalData.forEach((row, index) => {
+      const aiResult = aiResults[index]
+      const products = aiResult?.produkte
+
+      if (products && Array.isArray(products) && products.length > 0) {
+        products.forEach((prod, prodIndex) => {
+          const newRow: PdfDataRow = { ...row }
+
+          if (prodIndex > 0) {
+            newRow.pdfName = ''
+            newRow.fullPath = ''
+            newRow.confirmed = false
+          }
+
+          newRow.produkt = prod.produkt
+
+          if (currentMode === 'auftraege') {
+            newRow.menge = prod.menge
+            newRow.waehrung = prod.waehrung
+            newRow.preis = prod.preis
+          } else {
+            newRow.gelieferteMenge = prod.gelieferteMenge ?? prod.menge
+          }
+
+          newTableData.push(newRow)
+        })
+      } else {
+        const errorRow = { ...row }
+        if (!markdownDocuments[index]) {
+          errorRow.anmerkungen = 'Fehler: PDF konnte nicht gelesen werden.'
+        } else if (!aiResult) {
+          errorRow.anmerkungen = 'Fehler: KI hat nicht geantwortet.'
+        } else {
+          errorRow.anmerkungen = 'Keine Produkte erkannt.'
+        }
+        newTableData.push(errorRow)
+      }
+    })
+
+    hot.loadData(newTableData)
+    hot.render()
 
   } catch (error) {
-    console.error('Fehler im Backend:', error)
+    console.error('Kritischer Fehler im Prozess:', error)
+  } finally {
+    if (startBtn) startBtn.disabled = false
+    document.body.style.cursor = 'default'
   }
 }
 
@@ -421,6 +515,15 @@ function updateTableConfiguration() {
   }
   // Re-inject header checkbox after settings change (header DOM may be re-rendered)
   setTimeout(() => setupHeaderCheckbox(), 0)
+
+  const startResearchBtn = document.querySelector('#start-process-btn') as HTMLButtonElement
+  if (startResearchBtn) {
+    const prompt = currentMode === 'auftraege' ? promptAuftrag : promptRechnung
+    controller?.abort()
+    controller = new AbortController()
+    const signal = controller.signal
+    startResearchBtn.addEventListener('click', () => { handleReseachStart(prompt) }, { signal: signal })
+  }
 }
 
 /**

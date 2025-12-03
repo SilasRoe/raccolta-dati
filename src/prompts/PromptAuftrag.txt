@@ -1,0 +1,46 @@
+EINGABE: Du bekommst als INPUT eine einzige Zeichenkette mit dem vollständigen Markdown-Inhalt einer PDF-Datei. Dieses Markdown kann in beliebigen Sprachen sein, das Ergebnis soll auf Italienisch sein.
+
+AUFGABE: Extrahiere die folgenden relevanten Informationen einer Auftragsbescheinigung aus dem Markdown und liefere exakt ein einziges gültiges JSON-Objekt als einzige Ausgabe. Keine Erläuterungen, keine Textteile, kein Markdown — nur reines JSON.
+
+ERWARTETES JSON-SCHEMA (Pflichtfelder wenn vorhanden, sonst null / leeres Array):
+{
+  "produkte": [                      	// Array: eine Bestellung kann mehrere Produkte/Positionen haben
+    {
+      "produkt": string | null,      	// Produktbezeichnung (übersetze die Produktnamen wortwörtlich in Italienisch, das heißt jedes Wort für sich, nicht den ganzen String auf einmal. Beispiel: aus "CARDO MARIANO SEMEN" machst du "CARDO MARIANO SEMI" und NICHT "SEMI DI CARDO MARIANO")
+      "menge": number | null,        	// Menge als Zahl (keine Tausendertrennzeichen, Dezimalpunkt; kann kg, pz oder ähnliches sein)
+      "waehrung": string | null,     	// Währung falls vorhanden (ISO-Code z. B. "EUR" oder Symbol)
+      "preis": number | null 		      // Preis pro Kilogramm als Zahl (ohne Währungssymbol)
+    }
+  ]
+}
+
+FORMAT- UND NORMALISIERUNGSREGELN:
+- Zahlen: als JSON-Zahlen (z. B. 1234.56). Entferne Tausenderpunkte/commas. Dezimaltrennzeichen = Punkt.
+- Währung: gib wenn möglich den ISO-Code (z. B. "EUR") an.
+- Produktnamen: bereinige überflüssige Whitespaces, behalte Sonderzeichen.
+- Produkte: wenn keine Produkt-Positionen gefunden werden, liefere "produkte": [].
+- Felder, die nicht gefunden werden, müssen als null ausgegeben werden (nicht als leeres String).
+- Ausgabe darf kein zusätzliches Feld enthalten außer dem oben spezifizierten Schema (zusätzliche meta-Felder sind verboten).
+
+BEISPIEL-AUSGABE:
+{
+  "produkte":[
+    {
+      "produkt":"Produkt A",
+      "menge":1000,
+      "waehrung":"EUR",
+      "preis":1.25
+    },
+    {
+      "produkt":"Produkt B",
+      "menge":50,
+      "waehrung":"EUR",
+      "preisEinheit":12.5
+    }
+  ]
+}
+
+NOCHMALS: Gib ausschließlich gültiges JSON als Einzelausgabe zurück. Nichts anderes.
+
+
+EINGABE:
