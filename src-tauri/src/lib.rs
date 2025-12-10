@@ -3,29 +3,40 @@ use dotenv::dotenv;
 use serde_json::{json, Value};
 use std::env;
 use std::fs;
-use std::process::Command;
 use tauri::command;
+use tauri_plugin_shell::ShellExt;
 
-// Die Prompts werden zur Kompilierzeit geladen
 const PROMPT_AUFTRAG: &str = include_str!("../../src/prompts/PromptAuftrag.txt");
 const PROMPT_RECHNUNG: &str = include_str!("../../src/prompts/PromptRechnung.txt");
 
 #[command]
-async fn analyze_document(path: String, doc_type: String) -> Result<Value, String> {
+async fn analyze_document(
+    app: tauri::AppHandle,
+    path: String,
+    doc_type: String,
+) -> Result<Value, String> {
     dotenv().ok();
-    let api_key = env::var("MISTRAL_API_KEY").map_err(|_| "API Key fehlt")?;
+    const API_KEY: &str = env!("MISTRAL_API_KEY");
+    let api_key = API_KEY;
 
     let mut extracted_text = String::new();
-    let layout_instruction: String;
 
-    let output = Command::new("pdftotext")
-        .args(&["-layout", "-enc", "UTF-8", &path, "-"])
-        .output();
-    if let Ok(out) = output {
-        if out.status.success() {
-            extracted_text = String::from_utf8_lossy(&out.stdout).to_string();
-        }
+    let sidecar_command = app
+        .shell()
+        .sidecar("pdftotext")
+        .map_err(|e| format!("Sidecar Konfiguration Fehler: {}", e))?
+        .args(&["-layout", "-enc", "UTF-8", &path, "-"]);
+
+    let output = sidecar_command
+        .output()
+        .await
+        .map_err(|e| format!("Konnte Sidecar nicht ausführen: {}", e))?;
+
+    if output.status.success() {
+        extracted_text = String::from_utf8_lossy(&output.stdout).to_string();
     }
+
+    let layout_instruction: String;
 
     if extracted_text.trim().len() < 50 {
         let file_bytes = fs::read(&path).map_err(|e| format!("Konnte Datei nicht lesen: {}", e))?;
@@ -126,6 +137,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![analyze_document])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

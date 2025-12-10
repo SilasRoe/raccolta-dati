@@ -9,13 +9,13 @@ ERWARTETES JSON-SCHEMA (Pflichtfelder wenn vorhanden, sonst null / leeres Array)
       "produkt": string | null,      	// Produktbezeichnung (übersetze die Produktnamen wortwörtlich in Italienisch, das heißt jedes Wort für sich, nicht den ganzen String auf einmal. Beispiel: aus "CARDO MARIANO SEMEN" machst du "CARDO MARIANO SEMI" und NICHT "SEMI DI CARDO MARIANO")
       "menge": number | null,        	// Menge als Zahl (keine Tausendertrennzeichen, Dezimalpunkt; kann kg, pz oder ähnliches sein)
       "waehrung": string | null,     	// Währung falls vorhanden (ISO-Code z. B. "EUR" oder Symbol)
-      "preis": number | null \t\t      // Preis pro Kilogramm als Zahl (ohne Währungssymbol)
+      "preis": number | null \t\t     // Preis pro Kilogramm als Zahl (ohne Währungssymbol)
     }
   ]
 }
 
 FORMAT- UND NORMALISIERUNGSREGELN:
-
+1. Sprache: Alle Daten müssen auf Italienisch übersetzt werden. Das beinhaltet vor allem die Produktnamen.
 2. ZAHLEN-FORMAT (WICHTIG): Im Roh-Text enthalten Zahlen oft Leerzeichen (z.B. "1 0 0 , 00" oder "2 , 5 5"). Du MUSST diese Leerzeichen entfernen, bevor du die Zahl interpretierst ("2 , 5 5" -> 2.55).
 3. ZAHLEN: Ausgabe als JSON-Zahlen (z. B. 1234.56). Dezimaltrennzeichen ist der Punkt.
 4. PRODUKTNAMEN: Bereinige überflüssige Whitespaces, behalte Sonderzeichen.
