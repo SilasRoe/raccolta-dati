@@ -56,6 +56,8 @@ let controller: AbortController | null = null
  * Initialize event listeners when DOM content is loaded
  */
 document.addEventListener('DOMContentLoaded', () => {
+  setupProgressBar()
+
   const startProcessBtn = document.querySelector('#start-process-btn') as HTMLButtonElement;
   if (startProcessBtn) {
     startProcessBtn.addEventListener('click', handleStartProcess);
@@ -188,6 +190,63 @@ async function handleSelectFolder() {
   updateFileUIAufträge()
 }
 
+/**
+ * Erstellt Balken UND Text-Anzeige im DOM
+ */
+function setupProgressBar() {
+  if (!document.getElementById('progress-container')) {
+    const container = document.createElement('div');
+    container.id = 'progress-container';
+    const bar = document.createElement('div');
+    bar.id = 'progress-bar';
+    container.appendChild(bar);
+    document.body.appendChild(container);
+
+    const text = document.createElement('div');
+    text.id = 'progress-text';
+    document.body.appendChild(text);
+  }
+}
+
+/**
+ * Aktualisiert Balken und Text.
+ * @param current Anzahl der ERLEDIGTEN Dateien
+ * @param total Gesamtanzahl
+ */
+function setProgress(current: number, total: number) {
+  const container = document.getElementById('progress-container');
+  const bar = document.getElementById('progress-bar');
+  const text = document.getElementById('progress-text');
+
+  if (!container || !bar || !text) return;
+
+  if (total <= 0) {
+    container.style.display = 'none';
+    text.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  text.style.display = 'block';
+  let percent = (current / total) * 100;
+  if (current === 0 && total > 0) {
+    percent = 1;
+  } else if (current > 0) {
+    percent = 5 + ((current / total) * 95);
+  }
+
+  bar.style.width = `${percent}%`;
+  text.textContent = `${current} / ${total}`;
+
+  if (current >= total) {
+    setTimeout(() => {
+      container.style.display = 'none';
+      text.style.display = 'none';
+      bar.style.width = '0%';
+    }, 1500)
+  }
+}
+
 async function handleReseachStart() {
   if (!hot) return
 
@@ -197,6 +256,12 @@ async function handleReseachStart() {
 
   try {
     const data = hot.getSourceData() as PdfDataRow[]
+
+    const validRows = data.filter(r => r.fullPath);
+    const totalTasks = validRows.length;
+    let completedCount = 0;
+    setProgress(0, totalTasks)
+
     const aiResults = await Promise.all(data.map(async (row, index) => {
       if (!row.fullPath) return null
 
@@ -208,15 +273,18 @@ async function handleReseachStart() {
           docType: row.docType
         })
 
-        console.log(result)
-
         const docType = row.docType
+
+        completedCount++;
+        setProgress(completedCount, totalTasks);
         return { index, row, docType, result }
       } catch (err) {
         console.error(err)
+        completedCount++;
+        setProgress(completedCount, totalTasks);
         hot!.setDataAtRowProp(index, 'status', 'Fehler')
         hot!.setDataAtRowProp(index, 'anmerkungen', String(err))
-        return null
+        return { index, row, docType: row.docType, result: {} as AiResponse }
       }
     }))
 

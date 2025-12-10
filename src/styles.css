@@ -417,3 +417,46 @@ h1 {
   margin: 0;
   flex: 0 0 auto;
 }
+
+/* --- Fortschrittsbalken & Text --- */
+#progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  z-index: 10000;
+  display: none;
+  /* Wird per JS eingeblendet */
+}
+
+#progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4caf50, #81c784);
+  transition: width 0.3s ease-out;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+#progress-text {
+  position: fixed;
+  top: 20px;
+  right: 100px;
+  font-family: sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+  background-color: var(--table-page-bg, rgba(255, 255, 255, 0.9));
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10001;
+  display: none;
+  /* Wird per JS eingeblendet */
+}
+
+/* Dark Mode Anpassung */
+[data-theme="dark"] #progress-text {
+  background-color: #3a3a3a;
+  color: #f6f6f6;
+}
