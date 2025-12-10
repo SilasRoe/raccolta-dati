@@ -16,7 +16,7 @@ async fn analyze_document(path: String, doc_type: String) -> Result<Value, Strin
     let api_key = env::var("MISTRAL_API_KEY").map_err(|_| "API Key fehlt")?;
 
     let mut extracted_text = String::new();
-    let mut layout_instruction = String::new();
+    let layout_instruction: String;
 
     let output = Command::new("pdftotext")
         .args(&["-layout", "-enc", "UTF-8", &path, "-"])
