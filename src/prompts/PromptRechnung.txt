@@ -4,10 +4,10 @@ TASK: Extract all relevant information from the text and return exactly one vali
 
 EXPECTED JSON SCHEMA:
 {
-  "produkt": [                         // Array with delivered/billed items (may be empty)
+  "produkt": [                            // Array with delivered/billed items (may be empty)
     {
-      "produkt": string,         // Product name (translate the product names literally into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
-      "gelieferteMenge": number | null  // Number (no text), without unit
+      "produkt": string,                  // Product name (translate the product names literally into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
+      "gelieferteMenge": number | null    // Number (no text), without unit
     }
   ],
   "nummerRechnung": string | null

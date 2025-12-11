@@ -266,7 +266,6 @@ async function handleReseachStart() {
       if (!row.fullPath) return null
 
       try {
-        hot!.setDataAtRowProp(index, 'status', 'Lädt...')
 
         const result = await invoke<AiResponse>('analyze_document', {
           path: row.fullPath,
@@ -282,7 +281,6 @@ async function handleReseachStart() {
         console.error(err)
         completedCount++;
         setProgress(completedCount, totalTasks);
-        hot!.setDataAtRowProp(index, 'status', 'Fehler')
         hot!.setDataAtRowProp(index, 'anmerkungen', String(err))
         return { index, row, docType: row.docType, result: {} as AiResponse }
       }
@@ -375,7 +373,7 @@ function updateFileUIAufträge() {
       const lastSeparatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
       const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0]
 
-      const isInvoice = fileName.toUpperCase().startsWith('FT_')
+      const isInvoice = fileName.toUpperCase().startsWith('FT')
       const docType = isInvoice ? 'rechnung' : 'auftrag'
 
       let datumRechnung, datumAuftrag, nummerAuftrag, kunde, lieferant
