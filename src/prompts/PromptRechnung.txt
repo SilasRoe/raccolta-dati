@@ -1,40 +1,42 @@
-EINGABE: Du bekommst als INPUT den Roh-Text einer Rechnung.
+INPUT: You receive the raw text of an invoice as INPUT.
 
-AUFGABE: Extrahiere alle relevanten Informationen einer Rechnung aus dem Text und liefere exakt ein einziges gültiges JSON-Objekt als einzige Ausgabe. Keine Erklärungen, keine zusätzlichen Texte, nur JSON.
+TASK: Extract all relevant information from the text and return exactly one valid JSON object as the sole output. No explanations, no additional text, just JSON.
 
-ERWARTETES JSON-SCHEMA:
+EXPECTED JSON SCHEMA:
 {
-  "produkte": [                         // Array mit gelieferten/abgerechneten Positionen (kann leer sein)
+  "produkt": [                         // Array with delivered/billed items (may be empty)
     {
-      "produkt": string | null,         // Produktbezeichnung (übersetze die Produktnamen wortwörtlich in Italienisch, das heißt jedes Wort für sich, nicht den ganzen String auf einmal. Beispiel: aus "CARDO MARIANO SEMEN" machst du "CARDO MARIANO SEMI" und NICHT "SEMI DI CARDO MARIANO")
-      "gelieferteMenge": number | null  // Zahl (kein Text), ohne Einheit
+      "produkt": string,         // Product name (translate the product names literally into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
+      "gelieferteMenge": number | null  // Number (no text), without unit
     }
   ],
   "nummerRechnung": string | null
 }
 
-FORMAT- UND NORMALISIERUNGSREGELN:
-1. Sprache: Alle Daten müssen auf Italienisch übersetzt werden. Das beinhaltet vor allem die Produktnamen.
-2. ZAHLEN-FORMAT (WICHTIG): Zahlen enthalten im Roh-Text oft Leerzeichen (z.B. "2 3 , 0 0" oder "9 , 9 5"). Du MUSST alle Leerzeichen innerhalb der Zahl entfernen ("2 3 , 0 0" -> 23.00).
-3. ZAHLEN: JSON-Zahlen, Dezimalpunkt, keine Tausendertrennzeichen.
-4. PRODUKTE: Wenn keine Produkte erkennbar, "produkte": [].
-5. FELDER: Nicht gefunden => null.
-6. RECHNUNGSNUMMER: Wenn mehrere Nummern vorhanden sind, wähle diejenige, die klar als "Fattura", "Invoice" o. ä. gekennzeichnet ist.
-7. AUSGABE: Darf nur die Felder aus diesem Schema enthalten — keine zusätzlichen Felder.
+FORMAT AND NORMALIZATION RULES:
+1. Language: All data must be translated into Italian. This applies in particular to product names.
+2. NUMBER FORMAT (IMPORTANT): Numbers often contain spaces in the raw text (e.g., “2 3 , 0 0” or “9 , 9 5”). You MUST remove all spaces within the number (“2 3 , 0 0” -> 23.00).
+3. NUMBERS: JSON numbers, decimal point, no thousand separators.
+4. "ATTENTION LAYOUT OFFSET: Due to formatting errors, prices and quantities are often NOT exactly on the same line as the product name. They may have slipped down a line (offset). Rule: If a product line has no prices, immediately look at the line directly below it. If there are “orphaned” numbers without text there, they belong to the product above."
+5. PRODUCTS: If no products are recognizable, “products”: [].
+6. FIELDS: Not found => null.
+6.1 PRODUCTS: If no product is found for a field, ignore that field. There must be NO entries in the JSON without a product!
+7. INVOICE NUMBER: If there are multiple numbers, choose the one that is clearly marked as “Fattura,” “Invoice,” or similar.
+8. OUTPUT: May only contain fields from this schema — no additional fields.
 
-BEISPIEL-AUSGABE:
+EXAMPLE OUTPUT:
 {
   "produkte":[
     {
-      "produkt":"Produkt A",
+      "produkt":“Product A”,
       "gelieferteMenge":1000
     },
     {
-      "produkt":"Produkt B",
+      "produkt":“Product B”,
       "gelieferteMenge":1500
     }
   ],
-  "nummerRechnung":"INV-12345"
+  "nummerRechnung":“INV-12345”
 }
 
-EINGABE:
+INPUT:

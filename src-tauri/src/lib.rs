@@ -25,7 +25,7 @@ async fn analyze_document(
         .shell()
         .sidecar("pdftotext")
         .map_err(|e| format!("Sidecar Konfiguration Fehler: {}", e))?
-        .args(&["-layout", "-enc", "UTF-8", &path, "-"]);
+        .args(&["-enc", "UTF-8", &path, "-"]);
 
     let output = sidecar_command
         .output()
@@ -77,11 +77,13 @@ async fn analyze_document(
         }
 
         layout_instruction =
-            "DAS LAYOUT IST MARKDOWN. Tabellen sind mit Pipes '|' markiert. Nutze diese Struktur."
+            "THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure."
                 .to_string();
     } else {
-        layout_instruction = "DAS LAYOUT IST 'WHITESPACE'. Spalten sind nur durch Leerzeichen getrennt. Es gibt keine Linien. Erschließe die Spalten visuell.".to_string();
+        layout_instruction = "THE LAYOUT IS ‘WHITESPACE’. Columns are separated only by spaces. There are no lines. Visualize the columns.".to_string();
     }
+
+    println!("{}", extracted_text);
 
     // Prompt Auswahl
     let base_prompt = if doc_type == "rechnung" {
@@ -127,6 +129,8 @@ async fn analyze_document(
     // JSON Parsing
     let result_obj: Value =
         serde_json::from_str(content_str).map_err(|e| format!("JSON Parse Fehler: {}", e))?;
+
+    println!("{}", result_obj);
 
     Ok(result_obj)
 }

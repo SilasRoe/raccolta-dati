@@ -332,7 +332,12 @@ async function handleReseachStart() {
     })
 
     hot.loadData(newTableData)
-    hot.render()
+
+    hot.render();
+
+    requestAnimationFrame(() => {
+      hot!.refreshDimensions();
+    });
 
   } catch (error) {
     console.error('Kritischer Fehler im Prozess:', error)
@@ -723,6 +728,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     },
+    renderAllRows: true,
+    viewportColumnRenderingOffset: 10,
+    viewportRowRenderingOffset: 10,
     width: '100%',
     height: '100%',
     stretchH: 'all',
@@ -739,6 +747,20 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   requestAnimationFrame(() => setupHeaderCheckbox())
+
+  const observer = new ResizeObserver(() => {
+    if (hot) {
+      hot.refreshDimensions();
+    }
+  });
+
+  observer.observe(container);
+
+  setTimeout(() => {
+    if (hot) {
+      hot.refreshDimensions();
+    }
+  }, 200)
 })
 
 /**
