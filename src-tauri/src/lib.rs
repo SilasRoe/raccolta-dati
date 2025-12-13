@@ -23,6 +23,7 @@ struct ExportRow {
     menge: Option<f64>,
     waehrung: Option<String>,
     preis: Option<f64>,
+    leer: Option<String>,
     datum_rechnung: Option<String>,
     nummer_rechnung: Option<String>,
     gelieferte_menge: Option<f64>,
@@ -35,11 +36,10 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
         return Err("Nessun dato selezionato.".to_string());
     }
 
-    // 1. Datei auswählen (bestehende oder neue)
     let file_path_opt = app
         .dialog()
         .file()
-        .add_filter("Excel", &["xlsx", "xls", "xlsm"])
+        .add_filter("Excel", &["xlsx", "xlsm"])
         .blocking_pick_file();
 
     let path_buf = match file_path_opt {
@@ -50,7 +50,6 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
     };
     let path = path_buf.as_path();
 
-    // 2. Workbook laden oder neu erstellen
     let mut book = if path.exists() {
         umya_spreadsheet::reader::xlsx::read(path).map_err(|e| {
             format!(
@@ -62,19 +61,14 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
         umya_spreadsheet::new_file()
     };
 
-    // 3. Arbeitsblatt wählen (Index 0 = erstes Blatt)
     let sheet = book
         .get_sheet_mut(&0)
         .ok_or("Non sono riuscito a trovare il primo foglio di lavoro.".to_string())?;
 
-    // 4. Nächste freie Zeile finden
-    // get_highest_row liefert die letzte Zeile mit Daten. +1 für die neue Zeile.
-    // Wenn Datei leer ist (row=0 oder 1), fangen wir Header an.
-    let mut next_row = sheet.get_highest_row() + 1;
+    let mut next_row = 4;
 
-    // Optional: Header schreiben, falls Datei neu/leer scheint
     if next_row <= 1 {
-        let headers: [&str; 12] = [
+        let headers: [&str; 13] = [
             "Datum",
             "Auftrag Nr.",
             "Kunde",
@@ -83,6 +77,7 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
             "Menge",
             "Währung",
             "Preis",
+            "",
             "Rechnung Datum",
             "Rechnung Nr.",
             "Gelief. Menge",
@@ -94,7 +89,6 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
         next_row = 2;
     }
 
-    // 5. Daten anhängen
     for row_data in data {
         if let Some(v) = row_data.datum_auftrag {
             sheet.get_cell_mut((1, next_row)).set_value(v);
@@ -120,23 +114,25 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
         if let Some(v) = row_data.preis {
             sheet.get_cell_mut((8, next_row)).set_value_number(v);
         }
-        if let Some(v) = row_data.datum_rechnung {
+        if let Some(v) = row_data.leer {
             sheet.get_cell_mut((9, next_row)).set_value(v);
         }
-        if let Some(v) = row_data.nummer_rechnung {
+        if let Some(v) = row_data.datum_rechnung {
             sheet.get_cell_mut((10, next_row)).set_value(v);
         }
+        if let Some(v) = row_data.nummer_rechnung {
+            sheet.get_cell_mut((11, next_row)).set_value(v);
+        }
         if let Some(v) = row_data.gelieferte_menge {
-            sheet.get_cell_mut((11, next_row)).set_value_number(v);
+            sheet.get_cell_mut((12, next_row)).set_value_number(v);
         }
         if let Some(v) = row_data.anmerkungen {
-            sheet.get_cell_mut((12, next_row)).set_value(v);
+            sheet.get_cell_mut((13, next_row)).set_value(v);
         }
 
         next_row += 1;
     }
 
-    // 6. Speichern
     let _ = umya_spreadsheet::writer::xlsx::write(&book, path)
         .map_err(|e| format!("Errore durante il salvataggio: {}", e))?;
 

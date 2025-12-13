@@ -376,9 +376,9 @@ function updateFileUIAufträge() {
   const newRows = newPaths.map((path): PdfDataRow | null => {
     try {
       const lastSeparatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-      const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0]
+      const fileName = path.substring(lastSeparatorIndex + 1).split('.pdf')[0].split('.PDF')[0].toUpperCase()
 
-      const isInvoice = fileName.toUpperCase().startsWith('FT')
+      const isInvoice = fileName.startsWith('FT')
       const docType = isInvoice ? 'rechnung' : 'auftrag'
 
       let datumRechnung, datumAuftrag, nummerAuftrag, kunde, lieferant
