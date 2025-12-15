@@ -1,8 +1,12 @@
 use base64::{engine::general_purpose, Engine as _};
+use chrono::NaiveDate;
 use dotenv::dotenv;
+use regex::{Captures, Regex};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+use std::fs::OpenOptions;
 use std::time::Duration;
 use tauri::command;
 use tauri_plugin_dialog::DialogExt;
@@ -23,17 +27,54 @@ struct ExportRow {
     menge: Option<f64>,
     waehrung: Option<String>,
     preis: Option<f64>,
-    leer: Option<String>,
     datum_rechnung: Option<String>,
     nummer_rechnung: Option<String>,
     gelieferte_menge: Option<f64>,
     anmerkungen: Option<String>,
 }
+struct SheetRow {
+    row_idx: u32,
+    supplier: String,
+    date: NaiveDate,
+}
+
+fn parse_date(date_str: &str) -> Option<NaiveDate> {
+    if let Ok(d) = NaiveDate::parse_from_str(date_str, "%d.%m.%Y") {
+        return Some(d);
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+        return Some(d);
+    }
+
+    if let Ok(days) = date_str.parse::<i64>() {
+        let base = NaiveDate::from_ymd_opt(1899, 12, 30)?;
+        return base.checked_add_signed(chrono::Duration::days(days));
+    }
+    None
+}
+
+fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
+    let re = Regex::new(r"(\d+)").unwrap();
+    let old_s = old_row.to_string();
+    let new_s = new_row.to_string();
+
+    re.replace_all(formula, |caps: &Captures| {
+        if &caps[0] == old_s.as_str() {
+            new_s.clone()
+        } else {
+            caps[0].to_string()
+        }
+    })
+    .to_string()
+}
 
 #[command]
-async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<String, String> {
+async fn export_to_excel(
+    app: tauri::AppHandle,
+    mut data: Vec<ExportRow>,
+) -> Result<String, String> {
     if data.is_empty() {
-        return Err("Nessun dato selezionato.".to_string());
+        return Err("Keine Daten ausgewählt.".to_string());
     }
 
     let file_path_opt = app
@@ -43,100 +84,151 @@ async fn export_to_excel(app: tauri::AppHandle, data: Vec<ExportRow>) -> Result<
         .blocking_pick_file();
 
     let path_buf = match file_path_opt {
-        Some(p) => p
-            .into_path()
-            .map_err(|e| format!("Errore di percorso: {}", e))?,
-        None => return Ok("Interruzione da parte dell'utente".to_string()),
+        Some(p) => p.into_path().map_err(|e| e.to_string())?,
+        None => return Ok("Abbruch durch Benutzer".to_string()),
     };
     let path = path_buf.as_path();
 
-    let mut book = if path.exists() {
-        umya_spreadsheet::reader::xlsx::read(path).map_err(|e| {
-            format!(
-                "Errore durante la lettura del file, il file è aperto?: {}",
-                e
-            )
-        })?
-    } else {
-        umya_spreadsheet::new_file()
-    };
+    if let Err(_) = OpenOptions::new().write(true).append(true).open(path) {
+        return Err("Zugriff verweigert! Datei ist geöffnet.".to_string());
+    }
+
+    let mut book =
+        umya_spreadsheet::reader::xlsx::read(path).map_err(|e| format!("Lesefehler: {}", e))?;
 
     let sheet = book
         .get_sheet_mut(&0)
-        .ok_or("Non sono riuscito a trovare il primo foglio di lavoro.".to_string())?;
+        .ok_or("Kein Arbeitsblatt gefunden.".to_string())?;
 
-    let mut next_row = 4;
+    let highest_row = sheet.get_highest_row();
 
-    if next_row <= 1 {
-        let headers: [&str; 13] = [
-            "Datum",
-            "Auftrag Nr.",
-            "Kunde",
-            "Lieferant",
-            "Produkt",
-            "Menge",
-            "Währung",
-            "Preis",
-            "",
-            "Rechnung Datum",
-            "Rechnung Nr.",
-            "Gelief. Menge",
-            "Anmerkungen",
-        ];
-        for (col, text) in headers.iter().enumerate() {
-            sheet.get_cell_mut(((col + 1) as u32, 1)).set_value(*text);
-        }
-        next_row = 2;
+    let mut existing_rows: Vec<SheetRow> = Vec::with_capacity(highest_row as usize);
+
+    for r in 2..=highest_row {
+        let s_val = sheet.get_value((4, r));
+        let d_val = sheet.get_value((1, r));
+
+        existing_rows.push(SheetRow {
+            row_idx: r,
+            supplier: s_val.to_lowercase(),
+            date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
+        });
     }
 
-    for row_data in data {
-        if let Some(v) = row_data.datum_auftrag {
-            sheet.get_cell_mut((1, next_row)).set_value(v);
+    let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
+
+    data.sort_by(|a, b| {
+        let date_a = parse_date(&a.datum_auftrag.clone().unwrap_or_default());
+        let date_b = parse_date(&b.datum_auftrag.clone().unwrap_or_default());
+        date_a.cmp(&date_b)
+    });
+
+    let data_len = data.len();
+
+    for new_row in data {
+        let target_supplier = new_row.lieferant.clone().unwrap_or_default().to_lowercase();
+        let target_date = parse_date(&new_row.datum_auftrag.clone().unwrap_or_default())
+            .unwrap_or(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
+
+        let mut insert_at = highest_row + 1;
+        let mut found_supplier_block = false;
+
+        for ex in &existing_rows {
+            if ex.supplier == target_supplier {
+                found_supplier_block = true;
+                if ex.date > target_date {
+                    insert_at = ex.row_idx;
+                    break;
+                }
+            } else if found_supplier_block {
+                insert_at = ex.row_idx;
+                break;
+            }
         }
-        if let Some(v) = row_data.nummer_auftrag {
-            sheet.get_cell_mut((2, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.kunde {
-            sheet.get_cell_mut((3, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.lieferant {
-            sheet.get_cell_mut((4, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.produkt {
-            sheet.get_cell_mut((5, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.menge {
-            sheet.get_cell_mut((6, next_row)).set_value_number(v);
-        }
-        if let Some(v) = row_data.waehrung {
-            sheet.get_cell_mut((7, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.preis {
-            sheet.get_cell_mut((8, next_row)).set_value_number(v);
-        }
-        if let Some(v) = row_data.leer {
-            sheet.get_cell_mut((9, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.datum_rechnung {
-            sheet.get_cell_mut((10, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.nummer_rechnung {
-            sheet.get_cell_mut((11, next_row)).set_value(v);
-        }
-        if let Some(v) = row_data.gelieferte_menge {
-            sheet.get_cell_mut((12, next_row)).set_value_number(v);
-        }
-        if let Some(v) = row_data.anmerkungen {
-            sheet.get_cell_mut((13, next_row)).set_value(v);
+        insertions.entry(insert_at).or_default().push(new_row);
+    }
+
+    for (row_idx, rows_to_insert) in insertions.iter().rev() {
+        let start_row = *row_idx;
+        let count = rows_to_insert.len() as u32;
+
+        sheet.insert_new_row(&start_row, &count);
+
+        let (template_row, formula_source_row) = if start_row > 2 {
+            (start_row - 1, start_row - 1)
+        } else {
+            (start_row + count, start_row + count)
+        };
+
+        let template_formula = {
+            match sheet.get_cell((13, template_row)) {
+                Some(c) => c.get_formula().to_string(),
+                None => String::new(),
+            }
+        };
+
+        let mut column_styles = Vec::with_capacity(13);
+        for col in 1..=13 {
+            column_styles.push(sheet.get_style((col, template_row)).clone());
         }
 
-        next_row += 1;
+        for (i, row_data) in rows_to_insert.iter().enumerate() {
+            let r = start_row + i as u32;
+
+            if let Some(v) = &row_data.datum_auftrag {
+                sheet.get_cell_mut((1, r)).set_value(v);
+            }
+            if let Some(v) = &row_data.nummer_auftrag {
+                sheet.get_cell_mut((2, r)).set_value(v);
+            }
+            if let Some(v) = &row_data.kunde {
+                sheet.get_cell_mut((3, r)).set_value(v);
+            }
+            if let Some(v) = &row_data.lieferant {
+                sheet.get_cell_mut((4, r)).set_value(v);
+            }
+            if let Some(v) = &row_data.produkt {
+                sheet.get_cell_mut((5, r)).set_value(v);
+            }
+            if let Some(v) = row_data.menge {
+                sheet.get_cell_mut((6, r)).set_value_number(v);
+            }
+            if let Some(v) = &row_data.waehrung {
+                sheet.get_cell_mut((7, r)).set_value(v);
+            }
+            if let Some(v) = row_data.preis {
+                sheet.get_cell_mut((8, r)).set_value_number(v);
+            }
+            if let Some(v) = &row_data.datum_rechnung {
+                sheet.get_cell_mut((10, r)).set_value(v);
+            }
+            if let Some(v) = &row_data.nummer_rechnung {
+                sheet.get_cell_mut((11, r)).set_value(v);
+            }
+            if let Some(v) = row_data.gelieferte_menge {
+                sheet.get_cell_mut((12, r)).set_value_number(v);
+            }
+            if let Some(v) = &row_data.anmerkungen {
+                sheet.get_cell_mut((18, r)).set_value(v);
+            }
+
+            for col in 1..=13 {
+                if let Some(style) = column_styles.get((col - 1) as usize) {
+                    sheet.set_style((col, r), style.clone());
+                }
+            }
+
+            if !template_formula.is_empty() {
+                let new_formula = adjust_formula(&template_formula, formula_source_row, r);
+                sheet.get_cell_mut((13, r)).set_formula(new_formula);
+            }
+        }
     }
 
     let _ = umya_spreadsheet::writer::xlsx::write(&book, path)
-        .map_err(|e| format!("Errore durante il salvataggio: {}", e))?;
+        .map_err(|e| format!("Errore di memoria: {}", e))?;
 
-    Ok(format!("Record aggiunti con successo."))
+    Ok(format!("{} Record ordinati con successo.", data_len))
 }
 
 #[command]
@@ -166,8 +258,6 @@ async fn analyze_document(
     if output.status.success() {
         extracted_text = String::from_utf8_lossy(&output.stdout).to_string();
     }
-
-    println!("pdftotext: \n{}", extracted_text);
 
     let mut layout_instruction: String;
 
@@ -209,8 +299,6 @@ async fn analyze_document(
             return Err("Mistral OCR hat kein verständliches Ergebnis geliefert.".to_string());
         }
 
-        println!("ocr: \n{}", path);
-
         used_ocr = true;
 
         layout_instruction =
@@ -235,7 +323,6 @@ async fn analyze_document(
 
     let client = reqwest::Client::new();
 
-    // Helper to check whether the `produkte` array exists and is non-empty
     let products_non_empty = |v: &Value| -> bool {
         v.get("produkte")
             .and_then(|p| p.as_array())
@@ -243,7 +330,6 @@ async fn analyze_document(
             .unwrap_or(false)
     };
 
-    // Helper async function to call the LLM with a prompt and parse the JSON result
     async fn call_llm(
         client: &reqwest::Client,
         api_key: &str,
@@ -304,8 +390,6 @@ async fn analyze_document(
             extracted_text = String::from_utf8_lossy(&output_layout.stdout).to_string();
         }
 
-        println!("pdftotext -layout: \n{}", path);
-
         layout_instruction = "THE LAYOUT IS LAYOUT. Preserve original PDF layout.".to_string();
 
         let retry_prompt = format!(
@@ -361,8 +445,6 @@ async fn analyze_document(
             } else {
                 return Err("Mistral OCR hat kein verständliches Ergebnis geliefert.".to_string());
             }
-
-            println!("OCR: \n{}", extracted_text);
 
             layout_instruction =
                 "THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure."

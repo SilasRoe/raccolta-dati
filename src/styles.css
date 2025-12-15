@@ -253,11 +253,11 @@ h1 {
 }
 
 .theme-toggle-icon-moon {
-  left: 9px;
+  left: 6px;
 }
 
 .theme-toggle-icon-sun {
-  right: 9px;
+  right: 6px;
 }
 
 .theme-toggle-input:checked+.theme-toggle-label {
@@ -572,13 +572,12 @@ h1 {
 .fab-button {
   position: fixed;
   top: 5rem;
-  right: 2rem;
+  right: 1.5rem;
   width: 56px;
   height: 56px;
   border-radius: 50%;
   border: none;
   background-color: #4CAF50;
-  /* Excel Grün */
   color: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   cursor: pointer;
@@ -598,12 +597,10 @@ h1 {
   transform: scale(0.95);
 }
 
-/* Dark mode Anpassung falls gewünscht */
 [data-theme="dark"] .fab-button {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
-/* --- Toast Notifications (Pop-Ups) --- */
 .toast-container {
   position: fixed;
   bottom: 24px;
@@ -614,7 +611,6 @@ h1 {
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
-  /* Klicks gehen durch, wenn keine Toast da ist */
 }
 
 .toast {
@@ -630,8 +626,6 @@ h1 {
   transform: translateY(20px) scale(0.95);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
-
-  /* Default: Neutral / Info */
   background-color: var(--text-color);
   color: var(--background-color);
 }
@@ -641,10 +635,8 @@ h1 {
   transform: translateY(0) scale(1);
 }
 
-/* Farben für Erfolg und Fehler */
 .toast.success {
   background-color: #4CAF50;
-  /* Dezentes Grün */
   color: white;
 }
 
@@ -654,7 +646,6 @@ h1 {
   color: white;
 }
 
-/* Dark Mode Anpassungen falls nötig, aber die Invertierung oben reicht oft schon */
 [data-theme="dark"] .toast {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }

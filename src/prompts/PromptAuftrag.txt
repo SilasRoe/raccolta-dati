@@ -7,8 +7,8 @@ EXPECTED JSON SCHEMA (mandatory fields if available, otherwise null/empty array)
   "produkte": [                       // Array: an order can have multiple products/items
     {
       "produkt": string,      	      // Product name (translate the product names literally into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
-      "menge": number | null,      // Quantity as a number (no thousand separators, decimal point; can be kg, pz, or similar)
-      "waehrung": string | null,      // Currency if available (ISO code, e.g., “EUR” or symbol)
+      "menge": number | null,         // Quantity as a number (no thousand separators, decimal point; can be kg, pz, or similar)
+      "waehrung": string | null,      // Currency if available (symbol, e.g. € or $)
       "preis": number | null          // Price per kilogram as a number (without currency symbol)
     }
   ]
