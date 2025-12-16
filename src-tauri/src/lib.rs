@@ -74,7 +74,7 @@ async fn export_to_excel(
     mut data: Vec<ExportRow>,
 ) -> Result<String, String> {
     if data.is_empty() {
-        return Err("Keine Daten ausgewählt.".to_string());
+        return Err("Nessun dato selezionato".to_string());
     }
 
     let file_path_opt = app
@@ -85,20 +85,20 @@ async fn export_to_excel(
 
     let path_buf = match file_path_opt {
         Some(p) => p.into_path().map_err(|e| e.to_string())?,
-        None => return Ok("Abbruch durch Benutzer".to_string()),
+        None => return Ok("Interruzione da parte dell'utente".to_string()),
     };
     let path = path_buf.as_path();
 
     if let Err(_) = OpenOptions::new().write(true).append(true).open(path) {
-        return Err("Zugriff verweigert! Datei ist geöffnet.".to_string());
+        return Err("Accesso negato! Il file è aperto".to_string());
     }
 
-    let mut book =
-        umya_spreadsheet::reader::xlsx::read(path).map_err(|e| format!("Lesefehler: {}", e))?;
+    let mut book = umya_spreadsheet::reader::xlsx::read(path)
+        .map_err(|e| format!("errore di lettura: {}", e))?;
 
     let sheet = book
         .get_sheet_mut(&0)
-        .ok_or("Kein Arbeitsblatt gefunden.".to_string())?;
+        .ok_or("Nessun foglio di lavoro trovato".to_string())?;
 
     let highest_row = sheet.get_highest_row();
 

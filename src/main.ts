@@ -419,10 +419,6 @@ function updateFileUIAufträge() {
 
   hot.loadData(tableData)
   updateHeaderCheckboxState()
-  const current = hot.getSourceData() as PdfDataRow[]
-  for (let i = 0; i < current.length; i++) {
-    applyRowConfirmedClass(i, Boolean(current[i].confirmed))
-  }
 }
 
 /**
@@ -468,9 +464,6 @@ function pdfNameRenderer(
     const checked = checkbox.checked
     if (hot) {
       hot.setDataAtRowProp(row, 'confirmed', checked)
-      applyRowConfirmedClass(row, checked)
-      hot.render()
-      updateHeaderCheckboxState()
     }
   })
 
@@ -522,36 +515,6 @@ function updateHeaderCheckboxState() {
     cbs.forEach(cb => { cb.checked = true; cb.indeterminate = false })
   } else {
     cbs.forEach(cb => { cb.checked = false; cb.indeterminate = true })
-  }
-}
-
-/**
- * Apply or remove the confirmed-row class for all cells in a given row
- */
-function applyRowConfirmedClass(row: number, confirmed: boolean) {
-  if (!hot) return
-  const colCount = hot.countCols()
-  for (let col = 0; col < colCount; col++) {
-    try {
-      const meta = (hot as any).getCellMeta(row, col) || {}
-      const existing = String(meta.className || '').split(/\s+/).filter(Boolean)
-
-      if (confirmed) {
-        if (!existing.includes('confirmed-row')) existing.push('confirmed-row')
-      } else {
-        // remove confirmed-row but keep other classes
-        const idx = existing.indexOf('confirmed-row')
-        if (idx >= 0) existing.splice(idx, 1)
-      }
-
-      if (existing.length > 0) {
-        (hot as any).setCellMeta(row, col, 'className', existing.join(' '))
-      } else {
-        (hot as any).setCellMeta(row, col, 'className', undefined)
-      }
-    } catch (e) {
-      // ignore out-of-range errors during init
-    }
   }
 }
 
@@ -614,14 +577,14 @@ function setupHeaderCheckbox() {
 
     checkbox.addEventListener('change', () => {
       const checked = checkbox.checked
-      const data = hot!.getSourceData() as PdfDataRow[]
-      for (let i = 0; i < data.length; i++) {
-        hot!.setDataAtRowProp(i, 'confirmed', checked)
-        // apply or remove visual class for each row
-        applyRowConfirmedClass(i, checked)
-      }
-      // Re-render so cells() is re-evaluated and classes are applied
-      hot!.render()
+      
+      // batch() verhindert unnötiges Neu-Rendern bei jeder einzelnen Änderung
+      hot!.batch(() => {
+        const data = hot!.getSourceData() as PdfDataRow[]
+        data.forEach((row, index) => {
+           hot!.setDataAtRowProp(index, 'confirmed', checked)
+        })
+      })
       updateHeaderCheckboxState()
     })
 
@@ -697,8 +660,27 @@ document.addEventListener('DOMContentLoaded', () => {
     columnSorting: false,
     contextMenu: false,
     fillHandle: true,
-    cells() {
-      return {}
+    cells(row, col) {
+      if (!hot) return {};
+
+      const cellProps: any = {};
+      const rowData = hot.getSourceDataAtRow(row) as PdfDataRow;
+
+      if (rowData && rowData.confirmed) {
+        if (col === 0) {
+          cellProps.className = 'htEllipsis htLink pdf-with-checkbox confirmed-row';
+        } else {
+          cellProps.className = 'htEllipsis confirmed-row';
+        }
+      }else {
+        if (col === 0) {
+          cellProps.className = 'htEllipsis htLink pdf-with-checkbox'
+        } else {
+          cellProps.className = 'htEllipsis'
+        }
+      }
+
+      return cellProps;
     },
     afterRender() {
       setupHeaderCheckbox()
@@ -708,10 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
       for (const c of changes) {
         const prop = c[1]
         if (prop === 'confirmed') {
-          const rowIndex = c[0] as number
-          const newVal = c[3] as boolean
-          applyRowConfirmedClass(rowIndex, Boolean(newVal))
-          if (hot) hot.render()
           updateHeaderCheckboxState()
           break
         }
