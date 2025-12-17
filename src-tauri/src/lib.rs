@@ -4,13 +4,12 @@ use dotenv::dotenv;
 use keyring::Entry;
 use regex::Regex;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::time::Duration;
-use tauri::Emitter;
 use tauri::{command, AppHandle};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -19,7 +18,7 @@ use tokio::time::sleep;
 const PROMPT_AUFTRAG: &str = include_str!("../../src/prompts/PromptAuftrag.txt");
 const PROMPT_RECHNUNG: &str = include_str!("../../src/prompts/PromptRechnung.txt");
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ExportRow {
     datum_auftrag: Option<String>,
@@ -90,7 +89,7 @@ fn get_api_key() -> Result<String, String> {
 #[command]
 async fn export_to_excel(
     app: tauri::AppHandle,
-    mut data: Vec<ExportRow>,
+    data: Vec<ExportRow>,
     file_path: Option<String>,
 ) -> Result<String, String> {
     if data.is_empty() {
@@ -139,152 +138,232 @@ async fn export_to_excel(
 
     let start_data_row = header_row + 1;
 
-    let mut existing_rows: Vec<SheetRow> = Vec::with_capacity(highest_row as usize);
+    let mut index_map: HashMap<(String, String), u32> = HashMap::new();
+    let mut existing_rows_for_sorting: Vec<SheetRow> = Vec::with_capacity(highest_row as usize);
 
     if highest_row >= start_data_row {
         for r in start_data_row..=highest_row {
             let s_val = sheet.get_value((4, r));
             let d_val = sheet.get_value((1, r));
 
-            existing_rows.push(SheetRow {
+            existing_rows_for_sorting.push(SheetRow {
                 row_idx: r,
                 supplier: s_val.to_lowercase(),
                 date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
             });
+
+            let auftrag_nr = sheet.get_value((2, r)).to_string().trim().to_lowercase();
+            let produkt = sheet.get_value((5, r)).to_string().trim().to_lowercase();
+
+            if !auftrag_nr.is_empty() && !produkt.is_empty() {
+                index_map.insert((auftrag_nr, produkt), r);
+            }
         }
     }
 
-    let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
+    let mut merged_input_map: HashMap<(String, String), ExportRow> = HashMap::new();
+    let mut unmatchable_rows: Vec<ExportRow> = Vec::new();
 
-    data.sort_by(|a, b| {
-        let date_a = parse_date(&a.datum_auftrag.clone().unwrap_or_default());
-        let date_b = parse_date(&b.datum_auftrag.clone().unwrap_or_default());
-        date_a.cmp(&date_b)
-    });
+    for row in data {
+        if let (Some(nr), Some(prod)) = (&row.nummer_auftrag, &row.produkt) {
+            let key = (nr.trim().to_lowercase(), prod.trim().to_lowercase());
 
-    let data_len = data.len();
-    let mut processed_count = 0;
-
-    for new_row in data {
-        let target_supplier = new_row.lieferant.clone().unwrap_or_default().to_lowercase();
-        let target_date = parse_date(&new_row.datum_auftrag.clone().unwrap_or_default())
-            .unwrap_or(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
-
-        let mut insert_at = highest_row + 1;
-        if insert_at < start_data_row {
-            insert_at = start_data_row;
+            if let Some(existing) = merged_input_map.get_mut(&key) {
+                if existing.datum_rechnung.is_none() {
+                    existing.datum_rechnung = row.datum_rechnung;
+                }
+                if existing.nummer_rechnung.is_none() {
+                    existing.nummer_rechnung = row.nummer_rechnung;
+                }
+                if existing.gelieferte_menge.is_none() {
+                    existing.gelieferte_menge = row.gelieferte_menge;
+                }
+                if existing.preis.is_none() {
+                    existing.preis = row.preis;
+                }
+                if existing.menge.is_none() {
+                    existing.menge = row.menge;
+                }
+            } else {
+                merged_input_map.insert(key, row);
+            }
+        } else {
+            unmatchable_rows.push(row);
         }
+    }
 
-        let mut found_supplier_block = false;
+    let mut processing_queue: Vec<ExportRow> = merged_input_map.into_values().collect();
+    processing_queue.append(&mut unmatchable_rows);
 
-        for ex in &existing_rows {
-            if ex.supplier == target_supplier {
-                found_supplier_block = true;
-                if ex.date > target_date {
+    let mut rows_to_insert: Vec<ExportRow> = Vec::new();
+    let mut updated_count = 0;
+
+    for row in processing_queue {
+        let key = (
+            row.nummer_auftrag
+                .clone()
+                .unwrap_or_default()
+                .trim()
+                .to_lowercase(),
+            row.produkt
+                .clone()
+                .unwrap_or_default()
+                .trim()
+                .to_lowercase(),
+        );
+
+        if let Some(&row_idx) = index_map.get(&key) {
+            if let Some(v) = &row.datum_rechnung {
+                sheet.get_cell_mut((10, row_idx)).set_value(v);
+            }
+            if let Some(v) = &row.nummer_rechnung {
+                sheet.get_cell_mut((11, row_idx)).set_value(v);
+            }
+            if let Some(v) = row.gelieferte_menge {
+                sheet.get_cell_mut((12, row_idx)).set_value_number(v);
+            }
+            if let Some(v) = &row.anmerkungen {
+                let existing_note = sheet.get_value((18, row_idx));
+                if existing_note.is_empty() {
+                    sheet.get_cell_mut((18, row_idx)).set_value(v);
+                }
+            }
+            updated_count += 1;
+        } else {
+            rows_to_insert.push(row);
+        }
+    }
+
+    if !rows_to_insert.is_empty() {
+        rows_to_insert.sort_by(|a, b| {
+            let date_a = parse_date(&a.datum_auftrag.clone().unwrap_or_default());
+            let date_b = parse_date(&b.datum_auftrag.clone().unwrap_or_default());
+            date_a.cmp(&date_b)
+        });
+
+        let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
+
+        for new_row in rows_to_insert.iter() {
+            let target_supplier = new_row.lieferant.clone().unwrap_or_default().to_lowercase();
+            let target_date = parse_date(&new_row.datum_auftrag.clone().unwrap_or_default())
+                .unwrap_or(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
+
+            let mut insert_at = sheet.get_highest_row() + 1;
+            if insert_at < start_data_row {
+                insert_at = start_data_row;
+            }
+
+            let mut found_supplier_block = false;
+
+            for ex in &existing_rows_for_sorting {
+                if ex.supplier == target_supplier {
+                    found_supplier_block = true;
+                    if ex.date > target_date {
+                        insert_at = ex.row_idx;
+                        break;
+                    }
+                } else if found_supplier_block {
+                    insert_at = ex.row_idx;
+                    break;
+                } else if ex.supplier > target_supplier {
                     insert_at = ex.row_idx;
                     break;
                 }
-            } else if found_supplier_block {
-                insert_at = ex.row_idx;
-                break;
-            } else if ex.supplier > target_supplier {
-                insert_at = ex.row_idx;
-                break;
             }
-        }
-        insertions.entry(insert_at).or_default().push(new_row);
-    }
-
-    for (row_idx, rows_to_insert) in insertions.iter().rev() {
-        let start_row = *row_idx;
-        let count = rows_to_insert.len() as u32;
-
-        sheet.insert_new_row(&start_row, &count);
-
-        let (template_row, formula_source_row) = if start_row > start_data_row {
-            (start_row - 1, start_row - 1)
-        } else {
-            (start_row + count, start_row + count)
-        };
-
-        let template_formula = {
-            match sheet.get_cell((13, template_row)) {
-                Some(c) => c.get_formula().to_string(),
-                None => String::new(),
-            }
-        };
-
-        let mut column_styles = Vec::with_capacity(13);
-        for col in 1..=13 {
-            column_styles.push(sheet.get_style((col, template_row)).clone());
+            insertions
+                .entry(insert_at)
+                .or_default()
+                .push(new_row.clone());
         }
 
-        for (i, row_data) in rows_to_insert.iter().enumerate() {
-            let r = start_row + i as u32;
+        for (row_idx, batch) in insertions.iter().rev() {
+            let start_row = *row_idx;
+            let count = batch.len() as u32;
 
-            if let Some(v) = &row_data.datum_auftrag {
-                sheet.get_cell_mut((1, r)).set_value(v);
-            }
-            if let Some(v) = &row_data.nummer_auftrag {
-                sheet.get_cell_mut((2, r)).set_value(v);
-            }
-            if let Some(v) = &row_data.kunde {
-                sheet.get_cell_mut((3, r)).set_value(v);
-            }
-            if let Some(v) = &row_data.lieferant {
-                sheet.get_cell_mut((4, r)).set_value(v);
-            }
-            if let Some(v) = &row_data.produkt {
-                sheet.get_cell_mut((5, r)).set_value(v);
-            }
-            if let Some(v) = row_data.menge {
-                sheet.get_cell_mut((6, r)).set_value_number(v);
-            }
-            if let Some(v) = &row_data.waehrung {
-                sheet.get_cell_mut((7, r)).set_value(v);
-            }
-            if let Some(v) = row_data.preis {
-                sheet.get_cell_mut((8, r)).set_value_number(v);
-            }
-            if let Some(v) = &row_data.datum_rechnung {
-                sheet.get_cell_mut((10, r)).set_value(v);
-            }
-            if let Some(v) = &row_data.nummer_rechnung {
-                sheet.get_cell_mut((11, r)).set_value(v);
-            }
-            if let Some(v) = row_data.gelieferte_menge {
-                sheet.get_cell_mut((12, r)).set_value_number(v);
-            }
-            if let Some(v) = &row_data.anmerkungen {
-                sheet.get_cell_mut((18, r)).set_value(v);
-            }
+            sheet.insert_new_row(&start_row, &count);
 
+            let (template_row, formula_source_row) = if start_row > start_data_row {
+                (start_row - 1, start_row - 1)
+            } else {
+                (start_row + count, start_row + count)
+            };
+
+            let template_formula = {
+                match sheet.get_cell((13, template_row)) {
+                    Some(c) => c.get_formula().to_string(),
+                    None => String::new(),
+                }
+            };
+
+            let mut column_styles = Vec::with_capacity(13);
             for col in 1..=13 {
-                if let Some(style) = column_styles.get((col - 1) as usize) {
-                    sheet.set_style((col, r), style.clone());
+                column_styles.push(sheet.get_style((col, template_row)).clone());
+            }
+
+            for (i, row_data) in batch.iter().enumerate() {
+                let r = start_row + i as u32;
+
+                if let Some(v) = &row_data.datum_auftrag {
+                    sheet.get_cell_mut((1, r)).set_value(v);
+                }
+                if let Some(v) = &row_data.nummer_auftrag {
+                    sheet.get_cell_mut((2, r)).set_value(v);
+                }
+                if let Some(v) = &row_data.kunde {
+                    sheet.get_cell_mut((3, r)).set_value(v);
+                }
+                if let Some(v) = &row_data.lieferant {
+                    sheet.get_cell_mut((4, r)).set_value(v);
+                }
+                if let Some(v) = &row_data.produkt {
+                    sheet.get_cell_mut((5, r)).set_value(v);
+                }
+                if let Some(v) = row_data.menge {
+                    sheet.get_cell_mut((6, r)).set_value_number(v);
+                }
+                if let Some(v) = &row_data.waehrung {
+                    sheet.get_cell_mut((7, r)).set_value(v);
+                }
+                if let Some(v) = row_data.preis {
+                    sheet.get_cell_mut((8, r)).set_value_number(v);
+                }
+
+                if let Some(v) = &row_data.datum_rechnung {
+                    sheet.get_cell_mut((10, r)).set_value(v);
+                }
+                if let Some(v) = &row_data.nummer_rechnung {
+                    sheet.get_cell_mut((11, r)).set_value(v);
+                }
+                if let Some(v) = row_data.gelieferte_menge {
+                    sheet.get_cell_mut((12, r)).set_value_number(v);
+                }
+
+                if let Some(v) = &row_data.anmerkungen {
+                    sheet.get_cell_mut((18, r)).set_value(v);
+                }
+
+                for col in 1..=13 {
+                    if let Some(style) = column_styles.get((col - 1) as usize) {
+                        sheet.set_style((col, r), style.clone());
+                    }
+                }
+
+                if !template_formula.is_empty() {
+                    let new_formula = adjust_formula(&template_formula, formula_source_row, r);
+                    sheet.get_cell_mut((13, r)).set_formula(new_formula);
                 }
             }
-
-            if !template_formula.is_empty() {
-                let new_formula = adjust_formula(&template_formula, formula_source_row, r);
-                sheet.get_cell_mut((13, r)).set_formula(new_formula);
-            }
-
-            processed_count += 1;
-            let _ = app.emit(
-                "excel-progress",
-                json!({
-                    "current": processed_count,
-                    "total": data_len
-                }),
-            );
         }
     }
 
     let _ = umya_spreadsheet::writer::xlsx::write(&book, path)
         .map_err(|e| format!("Speicherfehler: {}", e))?;
 
-    Ok(format!("{} Datensätze erfolgreich einsortiert.", data_len))
+    let inserted_count = rows_to_insert.len();
+    Ok(format!(
+        "Fertig: {} aktualisiert, {} neu eingefügt.",
+        updated_count, inserted_count
+    ))
 }
 
 async fn run_sidecar(app: &AppHandle, path: &str, use_layout: bool) -> Result<String, String> {
