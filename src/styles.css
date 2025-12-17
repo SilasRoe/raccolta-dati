@@ -649,3 +649,7 @@ h1 {
 [data-theme="dark"] .toast {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+
+.pdf-group-start {
+  border-top: 15px solid var(--background-color) !important;
+}

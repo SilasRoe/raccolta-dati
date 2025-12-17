@@ -661,26 +661,33 @@ document.addEventListener('DOMContentLoaded', () => {
     contextMenu: false,
     fillHandle: true,
     cells(row, col) {
-      if (!hot) return {};
+      if (!hot) return {}
 
-      const cellProps: any = {};
-      const rowData = hot.getSourceDataAtRow(row) as PdfDataRow;
+      const cellProps: any = {}
+      
+      const classList = ['htEllipsis']
 
-      if (rowData && rowData.confirmed) {
-        if (col === 0) {
-          cellProps.className = 'htEllipsis htLink pdf-with-checkbox confirmed-row';
-        } else {
-          cellProps.className = 'htEllipsis confirmed-row';
+      if (col === 0) {
+        classList.push('htLink', 'pdf-with-checkbox')
+      }
+
+      const rowData = hot.getSourceDataAtRow(row) as PdfDataRow
+      if (rowData) {
+        if (rowData.confirmed) {
+          classList.push('confirmed-row')
         }
-      }else {
-        if (col === 0) {
-          cellProps.className = 'htEllipsis htLink pdf-with-checkbox'
-        } else {
-          cellProps.className = 'htEllipsis'
+
+        if (row > 0) {
+          const prevRowData = hot.getSourceDataAtRow(row - 1) as PdfDataRow
+          if (prevRowData && prevRowData.fullPath !== rowData.fullPath) {
+            classList.push('pdf-group-start')
+          }
         }
       }
 
-      return cellProps;
+      cellProps.className = classList.join(' ')
+
+      return cellProps
     },
     afterRender() {
       setupHeaderCheckbox()
