@@ -6,6 +6,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { chunk } from "lodash";
 import { Store } from "@tauri-apps/plugin-store";
+import { listen } from "@tauri-apps/api/event";
 
 import "handsontable/styles/handsontable.min.css";
 import "handsontable/styles/ht-theme-main.min.css";
@@ -56,6 +57,7 @@ let controller: AbortController | null = null;
 
 let store: Store | null = null;
 
+let isProcessing = false;
 /**
  * Initialize event listeners when DOM content is loaded
  */
@@ -284,6 +286,7 @@ async function loadPdfsFromDirectory(path: string) {
  * Handle PDF file selection via file dialog
  */
 async function handleSelectFiles() {
+  if (isProcessing) return;
   const result = await open({
     title: "Selezionare i file PDF",
     multiple: true,
@@ -310,6 +313,7 @@ async function handleSelectFiles() {
  * Handle folder selection and filter PDF files
  */
 async function handleSelectFolder() {
+  if (isProcessing) return;
   const result = await open({
     title: "Selezionare la cartella PDF",
     directory: true,
@@ -379,11 +383,12 @@ function setProgress(current: number, total: number) {
 }
 
 async function handleReseachStart() {
-  if (!hot) return;
+  if (!hot || isProcessing) return;
 
   const startBtn = document.querySelector(
     "#start-process-btn"
   ) as HTMLButtonElement;
+  isProcessing = true;
   if (startBtn) startBtn.disabled = true;
   document.body.style.cursor = "wait";
 
@@ -449,14 +454,14 @@ async function handleReseachStart() {
 
     const newTableData: PdfDataRow[] = [];
 
-    data.forEach((row, index) => {
+    data.forEach((_row, index) => {
       const aiResult = aiResults[index]?.result;
       const products = aiResult?.produkte;
       const docType = aiResults[index]?.docType;
 
       if (products && Array.isArray(products) && products.length > 0) {
         products.forEach((prod, prodIndex) => {
-          const newRow: PdfDataRow = { ...row };
+          const newRow: PdfDataRow = { ..._row };
 
           if (prodIndex > 0) {
             newRow.pdfName = "";
@@ -478,7 +483,7 @@ async function handleReseachStart() {
           newTableData.push(newRow);
         });
       } else {
-        const errorRow = { ...row };
+        const errorRow = { ..._row };
         if (!aiResults[index]) {
           errorRow.anmerkungen = "Fehler: PDF konnte nicht gelesen werden.";
         } else if (!aiResult) {
@@ -499,7 +504,9 @@ async function handleReseachStart() {
     });
   } catch (error) {
     console.error("Kritischer Fehler im Prozess:", error);
+    showToast(`Fehler: ${error}`, "error");
   } finally {
+    isProcessing = false;
     if (startBtn) startBtn.disabled = false;
     document.body.style.cursor = "default";
   }
@@ -965,7 +972,9 @@ function toggleTheme() {
 }
 
 async function handleExportExcel() {
-  if (!hot) return;
+  if (!hot || isProcessing) return;
+
+  isProcessing = true;
 
   const allData = hot.getSourceData() as PdfDataRow[];
   const confirmedData = allData.filter((row) => row.confirmed);
@@ -975,8 +984,19 @@ async function handleExportExcel() {
     return;
   }
 
+  let unlisten: (() => void) | null = null;
+
   try {
     document.body.style.cursor = "wait";
+
+    setProgress(0, confirmedData.length);
+
+    unlisten = await listen<{ current: number; total: number }>(
+      "excel-progress",
+      (event) => {
+        setProgress(event.payload.current, event.payload.total);
+      }
+    );
 
     const defaultExcelPath = await store?.get<string>("defaultExcelPath");
 
@@ -988,11 +1008,16 @@ async function handleExportExcel() {
     if (msg !== "Demolizione") {
       showToast(msg, "success");
     }
+
+    isProcessing = false;
   } catch (err) {
     console.error(err);
     showToast(`${err}`, "error");
   } finally {
+    if (unlisten) unlisten();
+    setProgress(0, 0);
     document.body.style.cursor = "default";
+    isProcessing = false;
   }
 }
 

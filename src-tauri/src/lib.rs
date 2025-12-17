@@ -2,7 +2,7 @@ use base64::{engine::general_purpose, Engine as _};
 use chrono::NaiveDate;
 use dotenv::dotenv;
 use keyring::Entry;
-use regex::{Captures, Regex};
+use regex::Regex;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
@@ -10,6 +10,7 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::time::Duration;
+use tauri::Emitter;
 use tauri::{command, AppHandle};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -56,18 +57,10 @@ fn parse_date(date_str: &str) -> Option<NaiveDate> {
 }
 
 fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
-    let re = Regex::new(r"(\d+)").unwrap();
-    let old_s = old_row.to_string();
-    let new_s = new_row.to_string();
-
-    re.replace_all(formula, |caps: &Captures| {
-        if &caps[0] == old_s.as_str() {
-            new_s.clone()
-        } else {
-            caps[0].to_string()
-        }
-    })
-    .to_string()
+    let pattern = format!(r"([A-Z]){}\b", old_row);
+    let re = Regex::new(&pattern).unwrap();
+    re.replace_all(formula, format!("${{1}}{}", new_row))
+        .to_string()
 }
 
 #[tauri::command]
@@ -170,6 +163,7 @@ async fn export_to_excel(
     });
 
     let data_len = data.len();
+    let mut processed_count = 0;
 
     for new_row in data {
         let target_supplier = new_row.lieferant.clone().unwrap_or_default().to_lowercase();
@@ -275,6 +269,15 @@ async fn export_to_excel(
                 let new_formula = adjust_formula(&template_formula, formula_source_row, r);
                 sheet.get_cell_mut((13, r)).set_formula(new_formula);
             }
+
+            processed_count += 1;
+            let _ = app.emit(
+                "excel-progress",
+                json!({
+                    "current": processed_count,
+                    "total": data_len
+                }),
+            );
         }
     }
 
