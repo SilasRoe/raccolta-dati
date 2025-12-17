@@ -5,6 +5,7 @@ import Handsontable from "handsontable";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { chunk } from "lodash";
+import { Store } from "@tauri-apps/plugin-store";
 
 import "handsontable/styles/handsontable.min.css";
 import "handsontable/styles/ht-theme-main.min.css";
@@ -53,10 +54,13 @@ let selectedPdfPaths: string[] = [];
 
 let controller: AbortController | null = null;
 
+let store: Store | null = null;
+
 /**
  * Initialize event listeners when DOM content is loaded
  */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  store = await Store.load("settings.json");
   setupProgressBar();
 
   const startProcessBtn = document.querySelector(
@@ -125,17 +129,108 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (themeToggle) {
-    // Improve accessibility and ensure the visual switch styles are in sync
     themeToggle.setAttribute("role", "switch");
     themeToggle.setAttribute("aria-checked", String(themeToggle.checked));
     themeToggle.addEventListener("change", toggleTheme);
-    // Ensure the UI and document theme reflect the current toggle state on load
     toggleTheme();
   }
 
   if (exportBtn) {
     exportBtn.addEventListener("click", handleExportExcel);
   }
+
+  const settingsModal = document.getElementById("settings-modal");
+  const settingsBtn = document.getElementById("settings-btn");
+  const closeSettingsBtn = document.getElementById("close-settings-btn");
+  const saveSettingsBtn = document.getElementById("save-settings-btn");
+
+  const apiKeyInput = document.getElementById(
+    "setting-api-key"
+  ) as HTMLInputElement;
+  const pdfPathInput = document.getElementById(
+    "setting-pdf-path"
+  ) as HTMLInputElement;
+  const excelPathInput = document.getElementById(
+    "setting-excel-path"
+  ) as HTMLInputElement;
+  const themeSelect = document.getElementById(
+    "setting-theme"
+  ) as HTMLSelectElement;
+
+  document
+    .getElementById("setting-select-pdf")
+    ?.addEventListener("click", async () => {
+      const selected = await open({ directory: true });
+      if (typeof selected === "string") pdfPathInput.value = selected;
+    });
+
+  document
+    .getElementById("setting-select-excel")
+    ?.addEventListener("click", async () => {
+      const selected = await open({
+        filters: [{ name: "Excel", extensions: ["xlsx", "xlsm"] }],
+      });
+      if (typeof selected === "string") excelPathInput.value = selected;
+    });
+
+  settingsBtn?.addEventListener("click", async () => {
+    const apiKey = await store?.get<string>("apiKey");
+    const pdfPath = await store?.get<string>("defaultPdfPath");
+    const excelPath = await store?.get<string>("defaultExcelPath");
+    const theme = await store?.get<string>("defaultTheme");
+
+    if (apiKey) apiKeyInput.value = apiKey;
+    if (pdfPath) pdfPathInput.value = pdfPath;
+    if (excelPath) excelPathInput.value = excelPath;
+    if (theme) themeSelect.value = theme;
+
+    settingsModal!.style.display = "flex";
+  });
+
+  closeSettingsBtn?.addEventListener("click", () => {
+    settingsModal!.style.display = "none";
+  });
+
+  saveSettingsBtn?.addEventListener("click", async () => {
+    await store?.set("apiKey", apiKeyInput.value);
+    await store?.set("defaultPdfPath", pdfPathInput.value);
+    await store?.set("defaultExcelPath", excelPathInput.value);
+    await store?.set("defaultTheme", themeSelect.value);
+
+    await store?.save();
+
+    if (themeSelect.value === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+      (
+        document.getElementById("theme-toggle-input") as HTMLInputElement
+      ).checked = false;
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+      (
+        document.getElementById("theme-toggle-input") as HTMLInputElement
+      ).checked = true;
+    }
+
+    settingsModal!.style.display = "none";
+    showToast("Einstellungen gespeichert", "success");
+  });
+
+  store.get<string>("defaultTheme").then((theme) => {
+    if (theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      const toggle = document.getElementById(
+        "theme-toggle-input"
+      ) as HTMLInputElement;
+      if (toggle) toggle.checked = theme === "light";
+    }
+  });
+
+  store.get<string>("defaultPdfPath").then((path) => {
+    if (path) {
+      console.log("Lade Standard-PDF-Ordner:", path);
+      loadPdfsFromDirectory(path);
+    }
+  });
 });
 
 const selectFilesBtn = document.querySelector("#select-files-btn");
@@ -158,6 +253,26 @@ if (themeToggle) {
   themeToggle.addEventListener("change", toggleTheme);
   // Ensure the UI and document theme reflect the current toggle state on load
   toggleTheme();
+}
+
+async function loadPdfsFromDirectory(path: string) {
+  try {
+    const entries = await readDir(path);
+
+    const pdfEntries = entries.filter(
+      (entry) =>
+        entry.name?.toLowerCase().endsWith(".pdf") && !entry.isDirectory
+    );
+
+    selectedPdfPaths = await Promise.all(
+      pdfEntries.map((entry) => join(path, entry.name!))
+    );
+
+    updateFileUI();
+  } catch (e) {
+    console.error("Fehler beim Laden des Standardordners:", e);
+    showToast(`Fehler beim Laden des Ordners: ${path}`, "error");
+  }
 }
 
 /**
@@ -197,26 +312,8 @@ async function handleSelectFolder() {
   });
 
   if (typeof result === "string") {
-    try {
-      const entries = await readDir(result);
-
-      const pdfEntries = entries.filter(
-        (entry) =>
-          entry.name?.toLowerCase().endsWith(".pdf") && !entry.isDirectory
-      );
-
-      selectedPdfPaths = await Promise.all(
-        pdfEntries.map((entry) => join(result, entry.name!))
-      );
-    } catch (e) {
-      console.error("Fehler beim Lesen des Ordners:", e);
-      selectedPdfPaths = [];
-    }
-  } else {
-    selectedPdfPaths = [];
+    await loadPdfsFromDirectory(result);
   }
-
-  updateFileUI();
 }
 
 /**
@@ -671,11 +768,6 @@ function setupHeaderCheckbox() {
 }
 
 /**
- * Show an expanded view of a cell's content in a simple modal overlay
- */
-// Note: expanded-cell modal removed — context menu is disabled in favor of Ctrl+C and fill-handle
-
-/**
  * Handsontable instance for data grid
  */
 let hot: Handsontable | null = null;
@@ -871,19 +963,21 @@ async function handleExportExcel() {
   if (!hot) return;
 
   const allData = hot.getSourceData() as PdfDataRow[];
-
   const confirmedData = allData.filter((row) => row.confirmed);
 
   if (confirmedData.length === 0) {
-    showToast("Nessuna riga confermata trovata per l'esportazione.", "info");
+    showToast("Keine bestätigten Zeilen für den Export.", "info");
     return;
   }
 
   try {
     document.body.style.cursor = "wait";
 
+    const defaultExcelPath = await store?.get<string>("defaultExcelPath");
+
     const msg = await invoke<string>("export_to_excel", {
       data: confirmedData,
+      filePath: defaultExcelPath || null,
     });
 
     if (msg !== "Demolizione") {

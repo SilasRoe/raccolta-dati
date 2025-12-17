@@ -33,3 +33,4 @@ tokio = { version = "1", features = ["time"] }
 umya-spreadsheet = "2.3.3"
 chrono = "0.4"
 regex = "1"
+tauri-plugin-store = "2.4.1"

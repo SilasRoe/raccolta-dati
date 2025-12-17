@@ -18,9 +18,14 @@
         }
       ]
     },
+    "shell:allow-open",
     "opener:default",
     "dialog:default",
     "fs:default",
+    {
+      "identifier": "fs:scope",
+      "allow": ["$HOME/**", "D:\\**", "C:\\**"] 
+    },
     {
       "identifier": "opener:allow-open-path",
       "allow": [
@@ -37,6 +42,24 @@
           "path": "$HOME/**"
         }
       ]
-    }
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    "store:default",
+    "store:allow-load"
   ]
 }

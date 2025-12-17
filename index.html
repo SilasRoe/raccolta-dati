@@ -43,8 +43,58 @@
           </svg>
         </label>
       </div>
+
+      <button id="settings-btn" class="icon-btn" title="Einstellungen">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.39a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+          </path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </button>
     </div>
   </header>
+
+  <div id="settings-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h2 class="modal-title">Einstellungen</h2>
+
+      <div class="form-group">
+        <label>API Key (Mistral)</label>
+        <input type="password" id="setting-api-key" class="input-field" placeholder="sk-..." />
+      </div>
+
+      <div class="form-group">
+        <label>Standard PDF Ordner</label>
+        <div class="input-group">
+          <input type="text" id="setting-pdf-path" class="input-field" readonly placeholder="Nicht ausgewählt" />
+          <button id="setting-select-pdf" class="btn btn-secondary">Wählen</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Standard Excel Datei</label>
+        <div class="input-group">
+          <input type="text" id="setting-excel-path" class="input-field" readonly placeholder="Nicht ausgewählt" />
+          <button id="setting-select-excel" class="btn btn-secondary">Wählen</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Design</label>
+        <select id="setting-theme" class="input-field">
+          <option value="light">Hell</option>
+          <option value="dark">Dunkel</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button id="close-settings-btn" class="btn btn-ghost">Abbrechen</button>
+        <button id="save-settings-btn" class="btn btn-primary">Speichern</button>
+      </div>
+    </div>
+  </div>
 
   <div class="upload-section">
     <button class="file-button" id="select-files-btn">Selezionare i file PDF</button>

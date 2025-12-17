@@ -7,10 +7,12 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::fs::OpenOptions;
+use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{command, AppHandle};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_store::StoreExt;
 use tokio::time::sleep;
 
 const PROMPT_AUFTRAG: &str = include_str!("../../src/prompts/PromptAuftrag.txt");
@@ -72,20 +74,25 @@ fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
 async fn export_to_excel(
     app: tauri::AppHandle,
     mut data: Vec<ExportRow>,
+    file_path: Option<String>,
 ) -> Result<String, String> {
     if data.is_empty() {
         return Err("Keine Daten ausgewählt.".to_string());
     }
 
-    let file_path_opt = app
-        .dialog()
-        .file()
-        .add_filter("Excel", &["xlsx", "xlsm"])
-        .blocking_pick_file();
+    let path_buf = if let Some(p) = file_path {
+        PathBuf::from(p)
+    } else {
+        let file_path_opt = app
+            .dialog()
+            .file()
+            .add_filter("Excel", &["xlsx", "xlsm"])
+            .blocking_pick_file();
 
-    let path_buf = match file_path_opt {
-        Some(p) => p.into_path().map_err(|e| e.to_string())?,
-        None => return Ok("Abbruch durch Benutzer".to_string()),
+        match file_path_opt {
+            Some(p) => p.into_path().map_err(|e| e.to_string())?,
+            None => return Ok("Abbruch durch Benutzer".to_string()),
+        }
     };
     let path = path_buf.as_path();
 
@@ -391,8 +398,22 @@ async fn analyze_document(
     doc_type: String,
 ) -> Result<Value, String> {
     dotenv().ok();
-    let api_key = env::var("MISTRAL_API_KEY")
-        .map_err(|e| format!("MISTRAL_API_KEY environment variable not set: {}", e))?;
+    let store = app
+        .store("settings.json")
+        .map_err(|e| format!("Store Fehler: {}", e))?;
+
+    let api_key_val = store
+        .get("apiKey")
+        .ok_or("API Key nicht in Einstellungen gefunden.")?;
+
+    let api_key = api_key_val
+        .as_str()
+        .ok_or("API Key hat falsches Format")?
+        .to_string();
+
+    if api_key.trim().is_empty() {
+        return Err("API Key ist leer. Bitte in den Einstellungen eintragen.".to_string());
+    }
 
     let client = reqwest::Client::new();
 
@@ -482,6 +503,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![analyze_document, export_to_excel])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

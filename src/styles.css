@@ -5,14 +5,18 @@
 }
 
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
 
   /* Base colors (light theme defaults) */
   --background-color: #f6f6f6;
-  --text-color: #000000;
+  --text-color: #1e293b;
+
+  --bg-secondary: #f8fafc;
+  --border-color: #e2e8f0;
 
   /* UI tokens */
   --button-bg: #c4c4c4;
@@ -43,6 +47,10 @@
   --table-header-bg: #3a3a3a;
   /* slightly lighter than page */
   --table-cell-bg: var(--background-color);
+  --bg-secondary: #1e293b;
+  /* Dunkleres Blau für Inputs */
+  --text-color: #f1f5f9;
+  --border-color: #222831;
 }
 
 html {
@@ -224,7 +232,7 @@ h1 {
   top: 50%;
   left: 3px;
   transform: translateY(-50%);
-  transition: transform 0.25s cubic-bezier(.2, .9, .2, 1);
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1);
   z-index: 1;
   /* keep knob below icons so icons remain visible */
 }
@@ -260,12 +268,12 @@ h1 {
   right: 6px;
 }
 
-.theme-toggle-input:checked+.theme-toggle-label {
+.theme-toggle-input:checked + .theme-toggle-label {
   /* keep checked visual (accent) but we override base background by theme rules below */
   background-color: #808080;
 }
 
-.theme-toggle-input:checked+.theme-toggle-label .theme-toggle-inner {
+.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-inner {
   transform: translateX(29px) translateY(-50%);
   background-color: #2f2f2f;
 }
@@ -297,7 +305,7 @@ h1 {
 }
 
 .sliding-nav::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   height: 3px;
@@ -323,7 +331,6 @@ h1 {
 .sliding-nav button.active {
   color: var(--text-color, #ffffff);
 }
-
 
 [data-theme="light"] .handsontable .htCore td,
 [data-theme="light"] .handsontable .htCore th {
@@ -460,8 +467,8 @@ h1 {
 
 #progress-text {
   position: fixed;
-  top: 20px;
-  right: 100px;
+  top: 1.5rem;
+  right: 8.5rem;
   font-family: inherit !important;
   font-size: 13px;
   font-weight: 600;
@@ -551,7 +558,7 @@ h1 {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background-color: #4CAF50;
+  background-color: #4caf50;
   color: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   cursor: pointer;
@@ -610,12 +617,12 @@ h1 {
 }
 
 .toast.success {
-  background-color: #4CAF50;
+  background-color: #4caf50;
   color: white;
 }
 
 .toast.error {
-  background-color: #E53935;
+  background-color: #e53935;
   /* Dezentes Rot */
   color: white;
 }
@@ -626,4 +633,177 @@ h1 {
 
 [data-theme] .handsontable .htCore td.pdf-group-start {
   border-top: 15px solid #2f2f2f !important;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  /* Rund */
+  transition: background-color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  /* Sanfter Hover-Effekt */
+  transform: rotate(15deg);
+  /* Verspielte Rotation beim Hover */
+}
+
+/* Modal Overlay mit Blur-Effekt */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  /* Modernes "Milchglas" */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s;
+}
+
+/* Modal Fenster */
+.modal-content {
+  background: var(--background-color);
+  color: var(--text-color);
+  padding: 30px;
+  border-radius: 12px;
+  /* Stärker abgerundet */
+  width: 420px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  /* Tieferer Schatten */
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal-title {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+/* Inputs & Labels */
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.input-field {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  /* Sollte eine leichte Kontrastfarbe zum BG sein */
+  color: var(--text-color);
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  /* Wichtig damit Padding nicht die Breite sprengt */
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #aecbfa;
+  /* Accent Color (Blau) */
+  box-shadow: 0 0 0 3px rgba(21, 43, 78, 0.1);
+}
+
+/* Input Gruppe für Pfad + Button nebeneinander */
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* --- Buttons --- */
+.modal-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+/* Primärer Button (Speichern) - Auffällig */
+.btn-primary {
+  background-color: #0f172a;
+  /* Dunkles Blau/Schwarz */
+  color: white;
+}
+
+[data-theme="dark"] .btn-primary {
+  background-color: #0f172a;
+  /* Leuchtendes Blau im Darkmode */
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* Sekundärer Button (Wählen) - Dezent */
+.btn-secondary {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  border-color: #999;
+}
+
+/* Ghost Button (Abbrechen) - Nur Text */
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  opacity: 1;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+#settings-btn {
+  position: fixed;
+  top: 1.2rem;
+  right: 6rem;
 }
