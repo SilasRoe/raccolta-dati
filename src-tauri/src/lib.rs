@@ -74,7 +74,7 @@ async fn export_to_excel(
     mut data: Vec<ExportRow>,
 ) -> Result<String, String> {
     if data.is_empty() {
-        return Err("Nessun dato selezionato".to_string());
+        return Err("Keine Daten ausgewählt.".to_string());
     }
 
     let file_path_opt = app
@@ -85,34 +85,49 @@ async fn export_to_excel(
 
     let path_buf = match file_path_opt {
         Some(p) => p.into_path().map_err(|e| e.to_string())?,
-        None => return Ok("Interruzione da parte dell'utente".to_string()),
+        None => return Ok("Abbruch durch Benutzer".to_string()),
     };
     let path = path_buf.as_path();
 
     if let Err(_) = OpenOptions::new().write(true).append(true).open(path) {
-        return Err("Accesso negato! Il file è aperto".to_string());
+        return Err("Zugriff verweigert! Datei ist geöffnet.".to_string());
     }
 
-    let mut book = umya_spreadsheet::reader::xlsx::read(path)
-        .map_err(|e| format!("errore di lettura: {}", e))?;
+    let mut book =
+        umya_spreadsheet::reader::xlsx::read(path).map_err(|e| format!("Lesefehler: {}", e))?;
 
     let sheet = book
         .get_sheet_mut(&0)
-        .ok_or("Nessun foglio di lavoro trovato".to_string())?;
+        .ok_or("Kein Arbeitsblatt gefunden.".to_string())?;
 
     let highest_row = sheet.get_highest_row();
 
+    let mut header_row = 1;
+    let search_limit = if highest_row < 100 { highest_row } else { 100 };
+
+    for r in 1..=search_limit {
+        let cell_val = sheet.get_value((4, r));
+        if cell_val.trim().eq_ignore_ascii_case("Casa Estera") {
+            header_row = r;
+            break;
+        }
+    }
+
+    let start_data_row = header_row + 1;
+
     let mut existing_rows: Vec<SheetRow> = Vec::with_capacity(highest_row as usize);
 
-    for r in 2..=highest_row {
-        let s_val = sheet.get_value((4, r));
-        let d_val = sheet.get_value((1, r));
+    if highest_row >= start_data_row {
+        for r in start_data_row..=highest_row {
+            let s_val = sheet.get_value((4, r));
+            let d_val = sheet.get_value((1, r));
 
-        existing_rows.push(SheetRow {
-            row_idx: r,
-            supplier: s_val.to_lowercase(),
-            date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
-        });
+            existing_rows.push(SheetRow {
+                row_idx: r,
+                supplier: s_val.to_lowercase(),
+                date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
+            });
+        }
     }
 
     let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
@@ -131,6 +146,10 @@ async fn export_to_excel(
             .unwrap_or(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
 
         let mut insert_at = highest_row + 1;
+        if insert_at < start_data_row {
+            insert_at = start_data_row;
+        }
+
         let mut found_supplier_block = false;
 
         for ex in &existing_rows {
@@ -141,6 +160,9 @@ async fn export_to_excel(
                     break;
                 }
             } else if found_supplier_block {
+                insert_at = ex.row_idx;
+                break;
+            } else if ex.supplier > target_supplier {
                 insert_at = ex.row_idx;
                 break;
             }
@@ -154,7 +176,7 @@ async fn export_to_excel(
 
         sheet.insert_new_row(&start_row, &count);
 
-        let (template_row, formula_source_row) = if start_row > 2 {
+        let (template_row, formula_source_row) = if start_row > start_data_row {
             (start_row - 1, start_row - 1)
         } else {
             (start_row + count, start_row + count)
@@ -212,7 +234,7 @@ async fn export_to_excel(
                 sheet.get_cell_mut((18, r)).set_value(v);
             }
 
-            for col in 1..=18 {
+            for col in 1..=13 {
                 if let Some(style) = column_styles.get((col - 1) as usize) {
                     sheet.set_style((col, r), style.clone());
                 }
@@ -226,9 +248,9 @@ async fn export_to_excel(
     }
 
     let _ = umya_spreadsheet::writer::xlsx::write(&book, path)
-        .map_err(|e| format!("Errore di memoria: {}", e))?;
+        .map_err(|e| format!("Speicherfehler: {}", e))?;
 
-    Ok(format!("{} Record ordinati con successo.", data_len))
+    Ok(format!("{} Datensätze erfolgreich einsortiert.", data_len))
 }
 
 async fn run_sidecar(app: &AppHandle, path: &str, use_layout: bool) -> Result<String, String> {
