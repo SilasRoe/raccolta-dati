@@ -17,33 +17,6 @@
     </div>
 
     <div class="header-right">
-      <div class="theme-toggle">
-        <input type="checkbox" id="theme-toggle-input" class="theme-toggle-input" aria-label="Theme toggle">
-        <label for="theme-toggle-input" class="theme-toggle-label" role="button" aria-pressed="false">
-          <span class="theme-toggle-inner"></span>
-          <!-- Moon SVG -->
-          <svg class="theme-toggle-icon theme-toggle-icon-moon" viewBox="0 0 24 24" fill="currentColor"
-            aria-hidden="true">
-            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
-          </svg>
-          <!-- Sun SVG -->
-          <svg class="theme-toggle-icon theme-toggle-icon-sun" viewBox="0 0 24 24" fill="currentColor"
-            aria-hidden="true">
-            <circle cx="12" cy="12" r="4"></circle>
-            <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
-              <line x1="12" y1="1" x2="12" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="23"></line>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-              <line x1="1" y1="12" x2="3" y2="12"></line>
-              <line x1="21" y1="12" x2="23" y2="12"></line>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </g>
-          </svg>
-        </label>
-      </div>
-
       <button id="settings-btn" class="icon-btn" title="Einstellungen">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -58,7 +31,34 @@
 
   <div id="settings-modal" class="modal-overlay" style="display: none;">
     <div class="modal-content">
-      <h2 class="modal-title">Einstellungen</h2>
+      <div style="display: flex;">
+        <h2 class="modal-title">Einstellungen</h2>
+
+        <div class="theme-toggle">
+          <input type="checkbox" id="theme-toggle-input" class="theme-toggle-input" aria-label="Theme toggle">
+          <label for="theme-toggle-input" class="theme-toggle-label" role="button" aria-pressed="false">
+            <span class="theme-toggle-inner"></span>
+            <svg class="theme-toggle-icon theme-toggle-icon-moon" viewBox="0 0 24 24" fill="currentColor"
+              aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+            </svg>
+            <svg class="theme-toggle-icon theme-toggle-icon-sun" viewBox="0 0 24 24" fill="currentColor"
+              aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </g>
+            </svg>
+          </label>
+        </div>
+      </div>
 
       <div class="form-group">
         <label>API Key (Mistral)</label>
@@ -79,14 +79,6 @@
           <input type="text" id="setting-excel-path" class="input-field" readonly placeholder="Nicht ausgewählt" />
           <button id="setting-select-excel" class="btn btn-secondary">Wählen</button>
         </div>
-      </div>
-
-      <div class="form-group">
-        <label>Design</label>
-        <select id="setting-theme" class="input-field">
-          <option value="light">Hell</option>
-          <option value="dark">Dunkel</option>
-        </select>
       </div>
 
       <div class="modal-actions">

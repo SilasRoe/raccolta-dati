@@ -202,7 +202,8 @@ h1 {
 
 .theme-toggle {
   display: flex;
-  align-items: center;
+  align-items: right;
+  flex: 1;
   justify-content: flex-end;
 }
 
@@ -468,7 +469,7 @@ h1 {
 #progress-text {
   position: fixed;
   top: 1.5rem;
-  right: 8.5rem;
+  right: 4.5rem;
   font-family: inherit !important;
   font-size: 13px;
   font-weight: 600;
@@ -805,5 +806,5 @@ h1 {
 #settings-btn {
   position: fixed;
   top: 1.2rem;
-  right: 5.6rem;
+  right: 1.5rem;
 }

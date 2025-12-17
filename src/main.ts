@@ -10,8 +10,6 @@ import { listen } from "@tauri-apps/api/event";
 
 import "handsontable/styles/handsontable.min.css";
 import "handsontable/styles/ht-theme-main.min.css";
-
-/** Interface für einen Datensatz der Handsontable */
 interface PdfDataRow {
   id: number;
   pdfName: string;
@@ -155,9 +153,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const excelPathInput = document.getElementById(
     "setting-excel-path"
   ) as HTMLInputElement;
-  const themeSelect = document.getElementById(
-    "setting-theme"
-  ) as HTMLSelectElement;
 
   document
     .getElementById("setting-select-pdf")
@@ -186,7 +181,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (apiKey) apiKeyInput.value = apiKey;
     if (pdfPath) pdfPathInput.value = pdfPath;
     if (excelPath) excelPathInput.value = excelPath;
-    if (theme) themeSelect.value = theme;
 
     settingsModal!.style.display = "flex";
   });
@@ -201,21 +195,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       await store?.set("defaultPdfPath", pdfPathInput.value);
       await store?.set("defaultExcelPath", excelPathInput.value);
-      await store?.set("defaultTheme", themeSelect.value);
 
       await store?.save();
-
-      if (themeSelect.value === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-        (
-          document.getElementById("theme-toggle-input") as HTMLInputElement
-        ).checked = false;
-      } else {
-        document.documentElement.setAttribute("data-theme", "light");
-        (
-          document.getElementById("theme-toggle-input") as HTMLInputElement
-        ).checked = true;
-      }
 
       settingsModal!.style.display = "none";
       showToast("Einstellungen gespeichert", "success");
@@ -496,9 +477,10 @@ async function handleReseachStart() {
     });
 
     hot.loadData(newTableData);
-
     hot.render();
-
+    hot.updateSettings({
+      allowInsertRow: true,
+    });
     requestAnimationFrame(() => {
       hot!.refreshDimensions();
     });
@@ -507,7 +489,6 @@ async function handleReseachStart() {
     showToast(`Fehler: ${error}`, "error");
   } finally {
     isProcessing = false;
-    if (startBtn) startBtn.disabled = false;
     document.body.style.cursor = "default";
   }
 }
@@ -824,14 +805,14 @@ document.addEventListener("DOMContentLoaded", () => {
         dateFormat: "DD.MM.YYYY",
         dateFormats: ["DD.MM.YYYY"],
         correctFormat: true,
-        width: 75,
+        width: 60,
       },
       { data: "nummerAuftrag", width: 50 },
       { data: "kunde", width: 120 },
       { data: "lieferant", width: 120 },
-      { data: "produkt", width: 160 },
+      { data: "produkt", width: 200 },
       { data: "menge", type: "numeric", width: 40 },
-      { data: "waehrung", width: 40 },
+      { data: "waehrung", width: 30 },
       {
         data: "preis",
         type: "numeric",
@@ -844,7 +825,7 @@ document.addEventListener("DOMContentLoaded", () => {
         dateFormat: "DD.MM.YYYY",
         dateFormats: ["DD.MM.YYYY"],
         correctFormat: true,
-        width: 75,
+        width: 60,
       },
       { data: "nummerRechnung", width: 50 },
       { data: "gelieferteMenge", type: "numeric", width: 40 },
@@ -853,7 +834,7 @@ document.addEventListener("DOMContentLoaded", () => {
     copyPaste: true,
     allowInsertRow: false,
     allowInsertColumn: false,
-    allowRemoveRow: false,
+    allowRemoveRow: true,
     allowRemoveColumn: false,
     manualColumnMove: false,
     manualRowMove: false,
@@ -862,7 +843,16 @@ document.addEventListener("DOMContentLoaded", () => {
     dropdownMenu: false,
     filters: false,
     columnSorting: false,
-    contextMenu: false,
+    contextMenu: {
+      items: {
+        row_above: { name: "Inserisci riga sopra" },
+        row_below: { name: "Inserisci riga sotto" },
+        remove_row: { name: "Rimuovi riga" },
+        "---------": { name: "---------" },
+        undo: { name: "Annulla" },
+        redo: { name: "Rifai" },
+      },
+    },
     fillHandle: true,
     cells(row, col) {
       if (!hot) return {};
@@ -899,7 +889,37 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     },
+    afterCreateRow: (index, amount, source) => {
+      if (source === "loadData" || !hot) return;
 
+      if (index > 0) {
+        const sourceRow = hot.getSourceDataAtRow(index - 1) as PdfDataRow;
+        if (!sourceRow) return;
+
+        hot.batch(() => {
+          for (let i = 0; i < amount; i++) {
+            const rowIdx = index + i;
+
+            const props: (keyof PdfDataRow)[] = [
+              "fullPath",
+              "docType",
+              "confirmed",
+              "kunde",
+              "lieferant",
+              "datumAuftrag",
+              "nummerAuftrag",
+              "datumRechnung",
+              "nummerRechnung",
+              "anmerkungen",
+            ];
+
+            props.forEach((prop) => {
+              hot!.setDataAtRowProp(rowIdx, prop, sourceRow[prop]);
+            });
+          }
+        });
+      }
+    },
     async afterOnCellMouseDown(event, coords) {
       if (coords.col === 0 && hot) {
         const target = event && (event.target as HTMLElement | null);
