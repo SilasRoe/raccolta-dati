@@ -8,7 +8,7 @@ use std::env;
 use std::fs;
 use std::fs::OpenOptions;
 use std::time::Duration;
-use tauri::command;
+use tauri::{command, AppHandle};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
 use tokio::time::sleep;
@@ -231,6 +231,137 @@ async fn export_to_excel(
     Ok(format!("{} Record ordinati con successo.", data_len))
 }
 
+async fn run_sidecar(app: &AppHandle, path: &str, use_layout: bool) -> Result<String, String> {
+    let mut args = vec!["-enc", "UTF-8"];
+    if use_layout {
+        args.push("-layout");
+    }
+    args.push(path);
+    args.push("-");
+
+    let sidecar_command = app
+        .shell()
+        .sidecar("pdftotext")
+        .map_err(|e| format!("Sidecar Konfiguration Fehler: {}", e))?
+        .args(&args);
+
+    let output = sidecar_command
+        .output()
+        .await
+        .map_err(|e| format!("Konnte Sidecar nicht ausführen: {}", e))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Err(format!("Sidecar Exit Code: {:?}", output.status.code()))
+    }
+}
+
+async fn call_llm(client: &reqwest::Client, api_key: &str, prompt: &str) -> Result<Value, String> {
+    let body = json!({
+        "model": "mistral-large-latest",
+        "messages": [
+            { "role": "user", "content": prompt }
+        ],
+        "response_format": { "type": "json_object" }
+    });
+
+    let res = client
+        .post("https://api.mistral.ai/v1/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("API Request Fehler: {}", e))?;
+
+    if !res.status().is_success() {
+        return Err(format!("API Status Fehler: {}", res.status()));
+    }
+
+    let json_res: Value = res
+        .json()
+        .await
+        .map_err(|e| format!("JSON Fehler: {}", e))?;
+
+    let content_str = json_res["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or("Kein Inhalt in der Antwort")?;
+
+    serde_json::from_str(content_str).map_err(|e| format!("JSON Parse Fehler: {}", e))
+}
+
+async fn perform_single_ocr(
+    client: &reqwest::Client,
+    api_key: &str,
+    path: &str,
+) -> Result<String, String> {
+    let file_bytes = fs::read(path).map_err(|e| format!("Konnte Datei nicht lesen: {}", e))?;
+    let b64_doc = general_purpose::STANDARD.encode(file_bytes);
+
+    let ocr_body = json!({
+        "model": "mistral-ocr-latest",
+        "document": {
+            "type": "document_url",
+            "document_url": format!("data:application/pdf;base64,{}", b64_doc)
+        }
+    });
+
+    let ocr_res = client
+        .post("https://api.mistral.ai/v1/ocr")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .json(&ocr_body)
+        .send()
+        .await
+        .map_err(|e| format!("OCR Request fehlgeschlagen: {}", e))?;
+
+    if !ocr_res.status().is_success() {
+        return Err(format!("Mistral OCR Status: {}", ocr_res.status()));
+    }
+
+    let ocr_json: Value = ocr_res.json().await.map_err(|e| e.to_string())?;
+
+    if let Some(pages) = ocr_json.get("pages").and_then(|p| p.as_array()) {
+        let text = pages
+            .iter()
+            .filter_map(|p| p.get("markdown").and_then(|m| m.as_str()))
+            .collect::<Vec<&str>>()
+            .join("\n\n");
+
+        if text.trim().is_empty() {
+            return Err("OCR Ergebnis war leer".to_string());
+        }
+        Ok(text)
+    } else {
+        Err("Keine Seiten im OCR Ergebnis gefunden".to_string())
+    }
+}
+
+async fn perform_ocr_with_retry(
+    client: &reqwest::Client,
+    api_key: &str,
+    path: &str,
+) -> Result<String, String> {
+    let max_retries = 2;
+    let mut last_error = String::new();
+
+    for attempt in 1..=max_retries {
+        match perform_single_ocr(client, api_key, path).await {
+            Ok(text) => return Ok(text),
+            Err(e) => {
+                last_error = e;
+                println!("OCR Versuch {} fehlgeschlagen: {}", attempt, last_error);
+                if attempt < max_retries {
+                    sleep(Duration::from_millis(1500)).await;
+                }
+            }
+        }
+    }
+    Err(format!(
+        "OCR fehlgeschlagen nach {} Versuchen. Letzter Fehler: {}",
+        max_retries, last_error
+    ))
+}
+
 #[command]
 async fn analyze_document(
     app: tauri::AppHandle,
@@ -241,73 +372,28 @@ async fn analyze_document(
     let api_key = env::var("MISTRAL_API_KEY")
         .map_err(|e| format!("MISTRAL_API_KEY environment variable not set: {}", e))?;
 
-    let mut extracted_text = String::new();
+    let client = reqwest::Client::new();
+
+    let mut extracted_text = run_sidecar(&app, &path, false).await.unwrap_or_default();
+    let mut layout_instruction = "THE LAYOUT IS ‘WHITESPACE’. Columns are separated only by spaces. There are no lines. Visualize the columns.".to_string();
     let mut used_ocr = false;
 
-    let sidecar_command = app
-        .shell()
-        .sidecar("pdftotext")
-        .map_err(|e| format!("Sidecar Konfiguration Fehler: {}", e))?
-        .args(&["-enc", "UTF-8", &path, "-"]);
-
-    let output = sidecar_command
-        .output()
-        .await
-        .map_err(|e| format!("Konnte Sidecar nicht ausführen: {}", e))?;
-
-    if output.status.success() {
-        extracted_text = String::from_utf8_lossy(&output.stdout).to_string();
-    }
-
-    let mut layout_instruction: String;
-
     if extracted_text.trim().len() < 50 {
-        let file_bytes = fs::read(&path).map_err(|e| format!("Konnte Datei nicht lesen: {}", e))?;
-
-        let b64_doc = general_purpose::STANDARD.encode(file_bytes);
-
-        let client = reqwest::Client::new();
-        let ocr_body = json!({
-            "model": "mistral-ocr-latest",
-            "document": {
-                "type": "document_url",
-                "document_url": format!("data:application/pdf;base64,{}", b64_doc)
+        match perform_ocr_with_retry(&client, &api_key, &path).await {
+            Ok(text) => {
+                extracted_text = text;
+                used_ocr = true;
+                layout_instruction =
+                    "THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure."
+                        .to_string();
             }
-        });
-
-        let ocr_res = client
-            .post("https://api.mistral.ai/v1/ocr")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .json(&ocr_body)
-            .send()
-            .await
-            .map_err(|e| format!("OCR Request fehlgeschlagen: {}", e))?;
-
-        if !ocr_res.status().is_success() {
-            return Err(format!("Mistral OCR Fehler: Status {}", ocr_res.status()));
+            Err(e) => {
+                return Err(format!(
+                    "Kritischer Fehler: Weder PDF-Text noch OCR möglich. ({})",
+                    e
+                ));
+            }
         }
-
-        let ocr_json: Value = ocr_res.json().await.map_err(|e| e.to_string())?;
-
-        if let Some(pages) = ocr_json.get("pages").and_then(|p| p.as_array()) {
-            extracted_text = pages
-                .iter()
-                .filter_map(|p| p.get("markdown").and_then(|m| m.as_str()))
-                .collect::<Vec<&str>>()
-                .join("\n\n");
-        } else {
-            return Err("Mistral OCR hat kein verständliches Ergebnis geliefert.".to_string());
-        }
-
-        used_ocr = true;
-
-        layout_instruction =
-            "THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure."
-                .to_string();
-
-        sleep(Duration::from_millis(2000)).await;
-    } else {
-        layout_instruction = "THE LAYOUT IS ‘WHITESPACE’. Columns are separated only by spaces. There are no lines. Visualize the columns.".to_string();
     }
 
     let base_prompt = if doc_type == "rechnung" {
@@ -316,13 +402,6 @@ async fn analyze_document(
         PROMPT_AUFTRAG
     };
 
-    let full_prompt = format!(
-        "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
-        base_prompt, layout_instruction, extracted_text
-    );
-
-    let client = reqwest::Client::new();
-
     let products_non_empty = |v: &Value| -> bool {
         v.get("produkte")
             .and_then(|p| p.as_array())
@@ -330,136 +409,46 @@ async fn analyze_document(
             .unwrap_or(false)
     };
 
-    async fn call_llm(
-        client: &reqwest::Client,
-        api_key: &str,
-        prompt: &str,
-    ) -> Result<Value, String> {
-        let body = json!({
-            "model": "mistral-large-latest",
-            "messages": [
-                { "role": "user", "content": prompt }
-            ],
-            "response_format": { "type": "json_object" }
-        });
-
-        let res = client
-            .post("https://api.mistral.ai/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", api_key))
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if !res.status().is_success() {
-            return Err(format!("API Fehler: {}", res.status()));
-        }
-
-        let json_res: Value = res.json().await.map_err(|e| e.to_string())?;
-
-        let content_str = json_res["choices"][0]["message"]["content"]
-            .as_str()
-            .ok_or("Kein Inhalt in der Antwort")?;
-
-        let parsed: Value =
-            serde_json::from_str(content_str).map_err(|e| format!("JSON Parse Fehler: {}", e))?;
-
-        Ok(parsed)
-    }
+    let full_prompt = format!(
+        "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
+        base_prompt, layout_instruction, extracted_text
+    );
 
     let mut result_obj = call_llm(&client, &api_key, &full_prompt).await?;
 
     if !products_non_empty(&result_obj) {
-        if used_ocr {
-            sleep(Duration::from_millis(2000)).await;
-            return Ok(result_obj);
-        }
-
-        let sidecar_layout = app
-            .shell()
-            .sidecar("pdftotext")
-            .map_err(|e| format!("Sidecar Konfiguration Fehler: {}", e))?
-            .args(&["-enc", "UTF-8", "-layout", &path, "-"]);
-
-        let output_layout = sidecar_layout
-            .output()
-            .await
-            .map_err(|e| format!("Konnte Sidecar nicht ausführen: {}", e))?;
-
-        if output_layout.status.success() {
-            extracted_text = String::from_utf8_lossy(&output_layout.stdout).to_string();
-        }
-
-        layout_instruction = "THE LAYOUT IS LAYOUT. Preserve original PDF layout.".to_string();
-
-        let retry_prompt = format!(
-            "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
-            base_prompt, layout_instruction, extracted_text
-        );
-
-        match call_llm(&client, &api_key, &retry_prompt).await {
-            Ok(parsed) => {
-                result_obj = parsed;
-                if products_non_empty(&result_obj) {
-                    sleep(Duration::from_millis(1000)).await;
-                    return Ok(result_obj);
-                }
-            }
-            Err(e) => return Err(e),
-        }
-
         if !used_ocr {
-            let file_bytes =
-                fs::read(&path).map_err(|e| format!("Konnte Datei nicht lesen: {}", e))?;
+            if let Ok(layout_text) = run_sidecar(&app, &path, true).await {
+                if layout_text.trim().len() > 50 {
+                    let retry_prompt = format!(
+                        "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS LAYOUT. Preserve original PDF layout.\n\nDokument Inhalt:\n{}",
+                        base_prompt, layout_text
+                    );
 
-            let b64_doc = general_purpose::STANDARD.encode(file_bytes);
-
-            let ocr_body = json!({
-                "model": "mistral-ocr-latest",
-                "document": {
-                    "type": "document_url",
-                    "document_url": format!("data:application/pdf;base64,{}", b64_doc)
+                    if let Ok(parsed) = call_llm(&client, &api_key, &retry_prompt).await {
+                        if products_non_empty(&parsed) {
+                            return Ok(parsed);
+                        }
+                    }
                 }
-            });
-
-            let ocr_res = client
-                .post("https://api.mistral.ai/v1/ocr")
-                .header("Authorization", format!("Bearer {}", api_key))
-                .json(&ocr_body)
-                .send()
-                .await
-                .map_err(|e| format!("OCR Request fehlgeschlagen: {}", e))?;
-
-            if !ocr_res.status().is_success() {
-                return Err(format!("Mistral OCR Fehler: Status {}", ocr_res.status()));
             }
 
-            let ocr_json: Value = ocr_res.json().await.map_err(|e| e.to_string())?;
-
-            if let Some(pages) = ocr_json.get("pages").and_then(|p| p.as_array()) {
-                extracted_text = pages
-                    .iter()
-                    .filter_map(|p| p.get("markdown").and_then(|m| m.as_str()))
-                    .collect::<Vec<&str>>()
-                    .join("\n\n");
-            } else {
-                return Err("Mistral OCR hat kein verständliches Ergebnis geliefert.".to_string());
+            match perform_ocr_with_retry(&client, &api_key, &path).await {
+                Ok(ocr_text) => {
+                    let retry_prompt = format!(
+                        "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure.\n\nDokument Inhalt:\n{}",
+                        base_prompt, ocr_text
+                    );
+                    result_obj = call_llm(&client, &api_key, &retry_prompt).await?;
+                }
+                Err(e) => {
+                    println!("Fallback OCR fehlgeschlagen: {}", e);
+                }
             }
-
-            layout_instruction =
-                "THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure."
-                    .to_string();
-
-            let retry_prompt = format!(
-                "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
-                base_prompt, layout_instruction, extracted_text
-            );
-
-            result_obj = call_llm(&client, &api_key, &retry_prompt).await?;
+        } else {
+            sleep(Duration::from_millis(1500)).await;
         }
     }
-
-    sleep(Duration::from_millis(1000)).await;
 
     Ok(result_obj)
 }
