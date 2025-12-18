@@ -97,23 +97,58 @@ fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
         .to_string()
 }
 
-#[tauri::command]
-fn save_api_key(key: String) -> Result<(), String> {
-    let entry = Entry::new("com.silas.maggus", "mistral_api_key").map_err(|e| e.to_string())?;
+const KEYRING_SERVICE: &str = "com.silas.maggus";
+const KEYRING_USER: &str = "mistral_api_key";
+
+#[command]
+async fn save_api_key(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    let key_trimmed = key.trim();
+    let keyring_result = Entry::new(KEYRING_SERVICE, KEYRING_USER);
+
+    match keyring_result {
+        Ok(entry) => {
+            if key_trimmed.is_empty() {
+                let _ = entry.delete_credential();
+            } else {
+                if let Err(e) = entry.set_password(key_trimmed) {
+                    println!(
+                        "⚠️ Errore di scrittura del portachiavi: {}. Utilizza il fallback...",
+                        e
+                    );
+                    return save_to_json_fallback(&app, key_trimmed);
+                }
+            }
+        }
+        Err(e) => {
+            println!(
+                "⚠️ Portachiavi non disponibile: {}. Utilizza fallback...",
+                e
+            );
+            return save_to_json_fallback(&app, key_trimmed);
+        }
+    }
+
+    let _ = save_to_json_fallback(&app, "");
+
+    Ok(())
+}
+
+fn save_to_json_fallback(app: &tauri::AppHandle, key: &str) -> Result<(), String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
 
     if key.is_empty() {
-        entry.delete_credential().map_err(|e| e.to_string())
+        store.delete("apiKey");
     } else {
-        entry.set_password(&key).map_err(|e| e.to_string())
+        store.set("apiKey", json!(key));
     }
+
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[command]
 async fn get_api_key() -> Result<String, String> {
-    let service = "com.silas.maggus";
-    let user = "api_key";
-
-    let entry = match Entry::new(service, user) {
+    let entry = match Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         Ok(e) => e,
         Err(_) => return Ok("".to_string()),
     };
