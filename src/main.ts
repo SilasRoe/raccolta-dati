@@ -548,6 +548,7 @@ function updateFileUI() {
   if (!hot) return;
 
   const currentData = hot.getSourceData() as PdfDataRow[];
+
   const existingPaths = new Set(
     currentData.map((row) => row.fullPath).filter(Boolean)
   );
@@ -558,6 +559,19 @@ function updateFileUI() {
       : 1;
 
   const newPaths = selectedPdfPaths.filter((path) => !existingPaths.has(path));
+
+  const duplicatesCount = selectedPdfPaths.length - newPaths.length;
+
+  if (duplicatesCount > 0) {
+    showToast(
+      `${duplicatesCount} File ignorati (già presenti nell'elenco).`,
+      "info"
+    );
+  }
+
+  if (newPaths.length === 0) {
+    return;
+  }
 
   const newRows = newPaths
     .map((path): PdfDataRow | null => {
@@ -889,6 +903,18 @@ document.addEventListener("DOMContentLoaded", () => {
     columnSorting: false,
     contextMenu: {
       items: {
+        re_analyze: {
+          name: "Analizza di nuovo",
+          disabled: function () {
+            const selection = this.getSelected();
+            if (!selection || selection.length === 0) return true;
+            return selection[0][0] !== selection[0][2];
+          },
+          callback: function (_key, selection) {
+            const row = selection[0].start.row;
+            reAnalyzeRow(row);
+          },
+        },
         row_above: { name: "Inserisci riga sopra" },
         row_below: { name: "Inserisci riga sotto" },
         remove_row: { name: "Rimuovi riga" },
@@ -976,7 +1002,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const rowIdx = index + i;
 
             const props: (keyof PdfDataRow)[] = [
-              "fullPath",
               "docType",
               "kunde",
               "lieferant",
@@ -984,7 +1009,6 @@ document.addEventListener("DOMContentLoaded", () => {
               "nummerAuftrag",
               "datumRechnung",
               "nummerRechnung",
-              "anmerkungen",
             ];
 
             props.forEach((prop) => {
@@ -1205,5 +1229,88 @@ async function loadAndRenderCorrections() {
     console.error("Errore durante il caricamento delle correzioni:", e);
     listEl.innerHTML =
       '<li class="empty-state">Errore durante il caricamento delle correzioni.</li>';
+  }
+}
+
+async function reAnalyzeRow(row: number) {
+  if (!hot) return;
+
+  const rowData = hot.getSourceDataAtRow(row) as PdfDataRow;
+
+  if (!rowData || !rowData.fullPath) {
+    showToast("Nessun percorso file presente in questa riga.", "error");
+    return;
+  }
+
+  document.body.classList.add("app-loading");
+  showToast("Analizza nuovamente il PDF...", "info");
+
+  try {
+    const result = await invoke<AiResponse>("analyze_document", {
+      path: rowData.fullPath,
+      docType: rowData.docType,
+    });
+
+    const products = result.produkte;
+
+    if (products && Array.isArray(products) && products.length > 0) {
+      hot.batch(() => {
+        const firstProd = products[0];
+
+        if (rowData.docType === "auftrag") {
+          hot!.setDataAtRowProp(row, "menge", firstProd.menge);
+          hot!.setDataAtRowProp(row, "waehrung", firstProd.waehrung);
+          hot!.setDataAtRowProp(row, "preis", firstProd.preis);
+        } else {
+          hot!.setDataAtRowProp(
+            row,
+            "gelieferteMenge",
+            firstProd.gelieferteMenge
+          );
+          hot!.setDataAtRowProp(row, "nummerRechnung", result.nummerRechnung);
+        }
+        hot!.setDataAtRowProp(row, "produkt", firstProd.produkt);
+
+        hot!.setDataAtRowProp(row, "anmerkungen", "");
+        if (products.length > 1) {
+          const extraProducts = products.slice(1);
+          hot!.alter("insert_row_below", row, extraProducts.length);
+
+          extraProducts.forEach((prod, i) => {
+            const newRowIdx = row + 1 + i;
+
+            hot!.setDataAtRowProp(newRowIdx, "produkt", prod.produkt);
+
+            if (rowData.docType === "auftrag") {
+              hot!.setDataAtRowProp(newRowIdx, "menge", prod.menge);
+              hot!.setDataAtRowProp(newRowIdx, "waehrung", prod.waehrung);
+              hot!.setDataAtRowProp(newRowIdx, "preis", prod.preis);
+            } else {
+              hot!.setDataAtRowProp(
+                newRowIdx,
+                "gelieferteMenge",
+                prod.gelieferteMenge
+              );
+              hot!.setDataAtRowProp(
+                newRowIdx,
+                "nummerRechnung",
+                result.nummerRechnung
+              );
+            }
+          });
+        }
+      });
+
+      showToast("Analisi completata con successo!", "success");
+    } else {
+      hot.setDataAtRowProp(row, "anmerkungen", "Nessun prodotto rilevato.");
+      showToast("Nessun prodotto riconosciuto.", "info");
+    }
+  } catch (err) {
+    console.error(err);
+    hot.setDataAtRowProp(row, "anmerkungen", String(err));
+    showToast("Errore nell'analisi.", "error");
+  } finally {
+    document.body.classList.remove("app-loading");
   }
 }
