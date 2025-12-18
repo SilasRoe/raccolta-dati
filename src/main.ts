@@ -762,10 +762,9 @@ function setupHeaderCheckbox() {
     checkbox.addEventListener("change", () => {
       const checked = checkbox.checked;
 
-      // batch() verhindert unnötiges Neu-Rendern bei jeder einzelnen Änderung
       hot!.batch(() => {
         const data = hot!.getSourceData() as PdfDataRow[];
-        data.forEach((row, index) => {
+        data.forEach((_row, index) => {
           hot!.setDataAtRowProp(index, "confirmed", checked);
         });
       });
@@ -898,16 +897,46 @@ document.addEventListener("DOMContentLoaded", () => {
     afterRender() {
       setupHeaderCheckbox();
     },
-    afterChange: (changes, source) => {
-      if (source === "loadData" || !changes) return;
+    afterChange(changes, source) {
+      if (!changes) return;
 
-      changes.forEach(([row, prop]) => {
+      if (
+        source === "loadData" ||
+        source === "timeValidate" ||
+        source === "dateValidate"
+      )
+        return;
+
+      for (const c of changes) {
+        const prop = c[1];
+        const oldVal = c[2];
+        const newVal = c[3];
+
         if (prop === "confirmed") {
           updateHeaderCheckboxState();
-          hot!.render();
-          return;
         }
-      });
+        if (
+          prop === "produkt" &&
+          (source === "edit" || source === "Autofill.fill")
+        ) {
+          if (
+            oldVal &&
+            newVal &&
+            oldVal !== newVal &&
+            typeof oldVal === "string" &&
+            typeof newVal === "string"
+          ) {
+            invoke("learn_correction", {
+              wrong: oldVal,
+              correct: newVal,
+            })
+              .then(() => {
+                console.log(`Imparato: "${oldVal}" -> "${newVal}"`);
+              })
+              .catch((err) => console.error("Errori di apprendimento:", err));
+          }
+        }
+      }
     },
     afterCreateRow: (index, amount, source) => {
       if (source === "loadData" || !hot) return;

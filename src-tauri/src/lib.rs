@@ -14,6 +14,7 @@ use tauri::Emitter;
 use tauri::{command, AppHandle};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_store::StoreExt;
 use tokio::time::sleep;
 
 const PROMPT_AUFTRAG: &str = include_str!("../../src/prompts/PromptAuftrag.txt");
@@ -547,7 +548,7 @@ async fn analyze_document(
             }
             Err(e) => {
                 return Err(format!(
-                    "Errore critico: né testo PDF né OCR possibili. ({})",
+                    "Errore critico: impossibile convertire il testo in PDF o eseguire l'OCR. ({})",
                     e
                 ));
             }
@@ -568,7 +569,7 @@ async fn analyze_document(
     };
 
     let full_prompt = format!(
-        "{}\n\\IMPORTANT LAYOUT-INFORMATION: {}\n\nDokument Inhalt:\n{}",
+        "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
         base_prompt, layout_instruction, extracted_text
     );
 
@@ -579,28 +580,32 @@ async fn analyze_document(
             if let Ok(layout_text) = run_sidecar(&app, &path, true).await {
                 if layout_text.trim().len() > 50 {
                     let retry_prompt = format!(
-                        "{}\n\\IMPORTANT LAYOUT-INFORMATION: THE LAYOUT IS LAYOUT. Preserve original PDF layout.\n\nDokument Inhalt:\n{}",
+                        "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS LAYOUT. Preserve original PDF layout.\n\nDokument Inhalt:\n{}",
                         base_prompt, layout_text
                     );
 
                     if let Ok(parsed) = call_llm(&client, &api_key, &retry_prompt).await {
                         if products_non_empty(&parsed) {
-                            return Ok(parsed);
+                            result_obj = parsed;
                         }
                     }
                 }
             }
 
-            match perform_ocr_with_retry(&client, &api_key, &path).await {
-                Ok(ocr_text) => {
-                    let retry_prompt = format!(
-                        "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure.\n\nDokument Inhalt:\n{}",
-                        base_prompt, ocr_text
-                    );
-                    result_obj = call_llm(&client, &api_key, &retry_prompt).await?;
-                }
-                Err(e) => {
-                    println!("Fallback OCR non riuscito: {}", e);
+            if !products_non_empty(&result_obj) {
+                match perform_ocr_with_retry(&client, &api_key, &path).await {
+                    Ok(ocr_text) => {
+                        let retry_prompt = format!(
+                            "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure.\n\nDokument Inhalt:\n{}",
+                            base_prompt, ocr_text
+                        );
+                        if let Ok(parsed) = call_llm(&client, &api_key, &retry_prompt).await {
+                            result_obj = parsed;
+                        }
+                    }
+                    Err(e) => {
+                        println!("Fallback OCR non riuscito: {}", e);
+                    }
                 }
             }
         } else {
@@ -608,7 +613,57 @@ async fn analyze_document(
         }
     }
 
+    if let Ok(store) = app.store("corrections.json") {
+        if let Some(val) = store.get("product_corrections") {
+            if let Ok(corrections) = serde_json::from_value::<HashMap<String, String>>(val) {
+                if let Some(products) = result_obj
+                    .get_mut("produkte")
+                    .and_then(|p| p.as_array_mut())
+                {
+                    for prod in products {
+                        if let Some(name_val) = prod.get_mut("produkt") {
+                            if let Some(name) = name_val.as_str() {
+                                if let Some(correction) = corrections.get(name) {
+                                    *name_val = json!(correction);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Ok(result_obj)
+}
+
+#[command]
+async fn learn_correction(
+    app: tauri::AppHandle,
+    wrong: String,
+    correct: String,
+) -> Result<(), String> {
+    if wrong.trim().is_empty() || correct.trim().is_empty() || wrong == correct {
+        return Ok(());
+    }
+
+    let store = app
+        .store("corrections.json")
+        .map_err(|e| format!("Errore di memoria: {}", e))?;
+
+    let mut corrections: HashMap<String, String> = match store.get("product_corrections") {
+        Some(val) => serde_json::from_value(val).unwrap_or_default(),
+        None => HashMap::new(),
+    };
+
+    corrections.insert(wrong.trim().to_string(), correct.trim().to_string());
+
+    store.set("product_corrections", json!(corrections));
+    store
+        .save()
+        .map_err(|e| format!("Errore di memoria: {}", e))?;
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -623,7 +678,8 @@ pub fn run() {
             analyze_document,
             export_to_excel,
             save_api_key,
-            get_api_key
+            get_api_key,
+            learn_correction
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
