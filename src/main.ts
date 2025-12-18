@@ -548,6 +548,7 @@ function updateFileUI() {
   if (!hot) return;
 
   const currentData = hot.getSourceData() as PdfDataRow[];
+
   const existingPaths = new Set(
     currentData.map((row) => row.fullPath).filter(Boolean)
   );
@@ -558,6 +559,19 @@ function updateFileUI() {
       : 1;
 
   const newPaths = selectedPdfPaths.filter((path) => !existingPaths.has(path));
+
+  const duplicatesCount = selectedPdfPaths.length - newPaths.length;
+
+  if (duplicatesCount > 0) {
+    showToast(
+      `${duplicatesCount} File ignorati (già presenti nell'elenco).`,
+      "info"
+    );
+  }
+
+  if (newPaths.length === 0) {
+    return;
+  }
 
   const newRows = newPaths
     .map((path): PdfDataRow | null => {
