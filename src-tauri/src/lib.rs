@@ -108,16 +108,19 @@ fn save_api_key(key: String) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
-fn get_api_key() -> Result<String, String> {
-    let entry = match Entry::new("com.silas.maggus", "mistral_api_key") {
+#[command]
+async fn get_api_key() -> Result<String, String> {
+    let service = "com.silas.maggus";
+    let user = "api_key";
+
+    let entry = match Entry::new(service, user) {
         Ok(e) => e,
-        Err(_) => return Ok(String::new()),
+        Err(_) => return Ok("".to_string()),
     };
 
     match entry.get_password() {
-        Ok(pwd) => Ok(pwd),
-        Err(_) => Ok(String::new()),
+        Ok(password) => Ok(password),
+        Err(_) => Ok("".to_string()),
     }
 }
 
@@ -565,7 +568,7 @@ async fn analyze_document(
     doc_type: String,
 ) -> Result<Value, String> {
     dotenv().ok();
-    let api_key = get_api_key()?;
+    let api_key = get_api_key().await?;
 
     if api_key.trim().is_empty() {
         return Err("La chiave API è vuota. Inserirla nelle impostazioni.".to_string());

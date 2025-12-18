@@ -69,7 +69,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("CRITICO: pulsante Esporta (#export-excel-btn) non trovato!");
   }
 
-  store = await Store.load("settings.json");
+  try {
+    store = await Store.load("settings.json");
+  } catch (err) {
+    console.warn("settings.json non trovato, crea nuovo archivio:", err);
+    await store?.save();
+    store = await Store.load("settings.json");
+  }
+
   setupProgressBar();
 
   const startProcessBtn = document.querySelector(
@@ -196,15 +203,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   settingsBtn?.addEventListener("click", async () => {
     const [apiKey, pdfPath, excelPath, theme] = await Promise.all([
-      invoke<string>("get_api_key"),
-      store?.get<string>("defaultPdfPath"),
-      store?.get<string>("defaultExcelPath"),
-      store?.get<string>("defaultTheme"),
+      invoke<string>("get_api_key").catch((err) => {
+        console.warn(
+          "Impossibile caricare la chiave API (forse al primo avvio):",
+          err
+        );
+        return "";
+      }),
+      store?.get("defaultPdfPath").catch(() => null),
+      store?.get("defaultExcelPath").catch(() => null),
+      store?.get("defaultTheme").catch(() => null),
     ]);
 
-    if (apiKey) apiKeyInput.value = apiKey;
-    if (pdfPath) pdfPathInput.value = pdfPath;
-    if (excelPath) excelPathInput.value = excelPath;
+    if (apiKeyInput) apiKeyInput.value = apiKey || "";
+    if (pdfPathInput) pdfPathInput.value = (pdfPath as string) || "";
+    if (excelPathInput) excelPathInput.value = (excelPath as string) || "";
     if (theme) themeToggle.checked = theme === "light";
 
     loadAndRenderCorrections();
@@ -237,7 +250,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  store.get<string>("defaultTheme").then((theme) => {
+  store?.get<string>("defaultTheme").then((theme) => {
     if (theme) {
       document.documentElement.setAttribute("data-theme", theme);
       const toggle = document.getElementById(
@@ -247,7 +260,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  store.get<string>("defaultPdfPath").then((path) => {
+  store?.get<string>("defaultPdfPath").then((path) => {
     if (path) {
       loadPdfsFromDirectory(path);
     }
