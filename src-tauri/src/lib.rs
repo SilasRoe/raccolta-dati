@@ -42,6 +42,39 @@ struct SheetRow {
     date: NaiveDate,
 }
 
+#[command]
+async fn get_corrections(app: tauri::AppHandle) -> Result<HashMap<String, String>, String> {
+    let store = app
+        .store("corrections.json")
+        .map_err(|e| format!("Store errore: {}", e))?;
+
+    match store.get("product_corrections") {
+        Some(val) => serde_json::from_value(val).map_err(|e| format!("Parse errore: {}", e)),
+        None => Ok(HashMap::new()),
+    }
+}
+
+#[command]
+async fn remove_correction(app: tauri::AppHandle, wrong: String) -> Result<(), String> {
+    let store = app
+        .store("corrections.json")
+        .map_err(|e| format!("Store errore: {}", e))?;
+
+    let mut corrections: HashMap<String, String> = match store.get("product_corrections") {
+        Some(val) => serde_json::from_value(val).unwrap_or_default(),
+        None => HashMap::new(),
+    };
+
+    if corrections.remove(&wrong).is_some() {
+        store.set("product_corrections", json!(corrections));
+        store
+            .save()
+            .map_err(|e| format!("Errore di memoria: {}", e))?;
+    }
+
+    Ok(())
+}
+
 fn parse_date(date_str: &str) -> Option<NaiveDate> {
     if let Ok(d) = NaiveDate::parse_from_str(date_str, "%d.%m.%Y") {
         return Some(d);
@@ -679,7 +712,9 @@ pub fn run() {
             export_to_excel,
             save_api_key,
             get_api_key,
-            learn_correction
+            learn_correction,
+            get_corrections,
+            remove_correction
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

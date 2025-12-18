@@ -867,3 +867,90 @@ h1 {
 .eye-btn:hover {
   opacity: 1; /* Beim Drüberfahren voll sichtbar */
 }
+
+.corrections-container {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--table-bg);
+  max-height: 150px; /* Nicht zu hoch werden lassen */
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.corrections-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.corrections-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.corrections-list li:last-child {
+  border-bottom: none;
+}
+
+.corrections-list li.empty-state {
+  color: var(--text-color);
+  opacity: 0.6;
+  font-style: italic;
+  justify-content: center;
+}
+
+/* Der Text-Teil: Pfeil dazwischen */
+.correction-text {
+  display: flex;
+  gap: 10px;
+  color: var(--text-color);
+  overflow: hidden;
+}
+
+.correction-wrong {
+  color: #e57373; /* Rotstich für falsch */
+  text-decoration: line-through;
+  opacity: 0.8;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.correction-arrow {
+  opacity: 0.5;
+}
+
+.correction-right {
+  color: #81c784; /* Grünstich für richtig */
+  font-weight: bold;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Löschen Button (kleiner Mülleimer) */
+.delete-correction-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-color);
+  opacity: 0.5;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.delete-correction-btn:hover {
+  opacity: 1;
+  background-color: rgba(255, 0, 0, 0.1); /* Leichter roter Hintergurnd */
+  color: #ff4d4d;
+}
