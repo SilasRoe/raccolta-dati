@@ -2,6 +2,8 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--background-color);
 }
 
 :root {
@@ -10,26 +12,19 @@
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
-
-  /* Base colors (light theme defaults) */
   --background-color: #f6f6f6;
   --text-color: #131a26;
-
   --bg-secondary: #f8fafc;
   --border-color: #e2e8f0;
-
-  /* UI tokens */
   --button-bg: #c4c4c4;
   --button-hover-bg: #d4d4d4;
   --toggle-knob-bg: #fff9ef;
-  /* warm off-white for knob in light mode */
-
-  /* Table color tokens */
   --table-page-bg: var(--background-color);
   --table-header-bg: #f4ecde;
-  /* slightly darker than page */
   --table-cell-bg: var(--background-color);
-
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #bbbbbb;
+  --scrollbar-thumb-hover: #999999;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -37,25 +32,36 @@
   -webkit-text-size-adjust: 100%;
 }
 
-body.app-loading,
-body.app-loading * {
-  cursor: wait !important;
-}
-
 [data-theme="dark"] {
   --background-color: #2f2f2f;
-  --text-color: #f6f6f6;
+  --text-color: #f1f5f9;
   --button-bg: #0f0f0f98;
   --button-hover-bg: #0f0f0f69;
-  /* Table color tokens */
   --table-page-bg: var(--background-color);
   --table-header-bg: #3a3a3a;
-  /* slightly lighter than page */
   --table-cell-bg: var(--background-color);
   --bg-secondary: #1e293b;
-  /* Dunkleres Blau für Inputs */
-  --text-color: #f1f5f9;
   --border-color: #222831;
+  --scrollbar-thumb: #4f4f4f;
+  --scrollbar-thumb-hover: #6f6f6f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+    background-color: #2f2f2f;
+  }
+  a:hover {
+    color: #24c8db;
+  }
+  input,
+  button {
+    color: #ffffff;
+    background-color: #0f0f0f98;
+  }
+  button:active {
+    background-color: #0f0f0f69;
+  }
 }
 
 html {
@@ -71,7 +77,6 @@ body {
   width: 100%;
   margin: 0;
   padding: 1.5rem;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -79,28 +84,43 @@ body {
   background-color: var(--background-color);
 }
 
+body.app-loading,
+body.app-loading * {
+  cursor: wait !important;
+}
+
+h1 {
+  text-align: left;
+  color: var(--text-color, #000000);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: auto;
 }
 
-.file-button {
-  border-radius: 8px;
-  padding: 0.25em 0.5em;
-  border: #5f5f5f;
-  font-weight: 500;
-  font-family: inherit !important;
-  color: var(--text-color, #ffffff);
-  background-color: var(--button-bg, #5f5f5f);
-  outline: none;
+.app-header,
+.upload-section,
+.sliding-nav {
+  flex: 0 0 auto;
 }
 
-.file-button {
-  cursor: pointer;
+.app-header {
+  display: flex;
+  align-items: center;
 }
 
-.file-button:hover {
-  background-color: var(--button-hover-bg, #8c8b8b);
+.header-left,
+.header-right {
+  flex: 1;
+}
+
+.header-left h1 {
+  margin: 0;
+}
+
+.header-center {
+  flex-shrink: 0;
 }
 
 .upload-section {
@@ -109,17 +129,6 @@ button:disabled {
   display: grid;
   grid-template-columns: max-content;
   gap: 0.5rem;
-}
-
-h1 {
-  text-align: left;
-  color: var(--text-color, #000000);
-}
-
-.app-header,
-.upload-section,
-.sliding-nav {
-  flex: 0 0 auto;
 }
 
 #data-grid {
@@ -132,433 +141,67 @@ h1 {
   z-index: 1;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-}
-
-.handsontable .htEllipsis {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.header-left,
-.header-right {
-  flex: 1;
-}
-
-.handsontable,
-.handsontable .htCore {
-  font-family: inherit !important;
-}
-
-/* Header checkbox wrapper for first column */
-.handsontable .htCore th .header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 4px 8px;
-  box-sizing: border-box;
-}
-
-.handsontable .htCore th .header-text {
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.handsontable .htCore th .header-confirmed {
-  margin: 0;
-}
-
-.header-center {
-  flex-shrink: 0;
-}
-
-.header-left h1 {
-  margin: 0;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
-.theme-toggle {
-  display: flex;
-  align-items: right;
-  flex: 1;
-  justify-content: flex-end;
-}
-
-.theme-toggle-input {
-  display: none;
-}
-
-.theme-toggle-label {
-  width: 56px;
-  /* slightly wider to give space for icons and knob */
-  height: 26px;
-  background-color: #5f5f5f;
-  display: block;
-  border-radius: 25px;
-  position: relative;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  color: #ffffff;
-}
-
-.theme-toggle-inner {
-  width: 20px;
-  height: 20px;
-  background-color: var(--toggle-knob-bg, #fdeed6);
-  border-radius: 50%;
-  position: absolute;
-  top: 50%;
-  left: 3px;
-  transform: translateY(-50%);
-  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1);
-  z-index: 1;
-  /* keep knob below icons so icons remain visible */
-}
-
-.theme-toggle-icon {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
-  line-height: 1;
-  transition: opacity 0.25s ease;
-  pointer-events: none;
-  display: block;
-  z-index: 2;
-  /* ensure icons render above the knob */
-  opacity: 1;
-  /* always visible */
-}
-
-.theme-toggle-icon svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  fill: currentColor;
-}
-
-.theme-toggle-icon-moon {
-  left: 6px;
-}
-
-.theme-toggle-icon-sun {
-  right: 6px;
-}
-
-.theme-toggle-input:checked + .theme-toggle-label {
-  /* keep checked visual (accent) but we override base background by theme rules below */
-  background-color: #808080;
-}
-
-.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-inner {
-  transform: translateX(29px) translateY(-50%);
-  background-color: #2f2f2f;
-}
-
-/* Use a warmer, darker icon color in light mode so icons stay visible above the light knob */
-[data-theme="light"] .theme-toggle-label {
-  /* Current app mode: LIGHT
-    - Switch (label) should show the INACTIVE (dark) background
-     - Icons should use the LIGHT background color so they appear "light" */
-  background-color: #2f2f2f;
-  /* dark (inactive) */
-  color: var(--background-color);
-  /* light/beige icons */
-}
-
-[data-theme="dark"] .theme-toggle-label {
-  /* Current app mode: DARK
-    - Switch should show the INACTIVE (light) background
-     - Icons should be dark/grey to appear "dark" */
-  background-color: #968d7e;
-  /* light (inactive) */
-  color: #2f2f2f;
-  /* dark grey icons */
-}
-
-.sliding-nav {
-  position: relative;
-  display: flex;
-}
-
-.sliding-nav::after {
-  content: "";
-  position: absolute;
-  bottom: -1px;
-  height: 3px;
-  background: var(--text-color, rgb(205, 21, 21));
-
-  left: var(--underline-left, 0);
-  width: var(--underline-width, 0);
-
-  transition: left 0.3s ease-out, width 0.3s ease-out;
-}
-
-.sliding-nav button {
-  border: none;
-  background: none;
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  font-size: 1rem;
-  color: var(--text-color, #ffffff);
+/* --- Buttons --- */
+.file-button {
+  border-radius: 8px;
+  padding: 0.25em 0.5em;
+  border: #5f5f5f;
   font-weight: 500;
-  transition: color 0.3s ease-out;
-}
-
-.sliding-nav button.active {
-  color: var(--text-color, #ffffff);
-}
-
-[data-theme="light"] .handsontable .htCore td,
-[data-theme="light"] .handsontable .htCore th {
-  background-color: var(--table-cell-bg) !important;
-}
-
-[data-theme="light"] .handsontable .htCore td,
-[data-theme="light"] .handsontable .htCore th {
-  border: 1px solid var(--border-color) !important;
-}
-
-[data-theme="light"] .handsontable .htCore td {
-  color: var(--text-color, #000000) !important;
-}
-
-[data-theme="light"] .handsontable .htCore th {
-  background-color: var(--table-header-bg) !important;
-  /* header */
-  color: var(--text-color, #000000) !important;
-  font-weight: 600;
-}
-
-[data-theme="light"] .handsontable .htCore td:first-child {
-  /* Ensure first column cells (data rows) also use header bg in light mode */
-  background-color: var(--table-header-bg) !important;
-  color: var(--text-color, #000000) !important;
-  font-weight: 600;
-}
-
-[data-theme="dark"] .handsontable .htCore td:first-child {
-  /* Ensure first column cells (data rows) also use header bg in dark mode */
-  background-color: var(--table-header-bg) !important;
-  color: var(--text-color) !important;
-  font-weight: 600;
-}
-
-/* Dark mode Handsontable adjustments: keep editable cells same as page bg,
-   header and first (PDF) column slightly lighter than background. */
-[data-theme="dark"] .handsontable .htCore td,
-[data-theme="dark"] .handsontable .htCore th {
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  background-color: var(--table-cell-bg) !important;
-  color: var(--text-color) !important;
-}
-
-[data-theme="dark"] .handsontable .htCore th,
-[data-theme="dark"] .handsontable .htCore td:first-child {
-  background-color: var(--table-header-bg) !important;
-  /* header + first column */
-  color: var(--text-color) !important;
-  font-weight: 600;
-}
-
-/* Confirmed row styling */
-.confirmed-row {
-  /* light, subtle green background for confirmed rows */
-  background-color: #d8ffe5 !important;
-}
-
-[data-theme="dark"] .confirmed-row {
-  /* darker green tint in dark mode */
-  background-color: #313e31 !important;
-}
-
-.handsontable .htCore td.confirmed-row,
-.handsontable .htCore td.confirmed-row .wtHolder {
-  /* light, subtle green background for confirmed rows (apply to cell) */
-  background-color: #d8ffe5 !important;
-}
-
-[data-theme="dark"] .handsontable .htCore td.confirmed-row,
-[data-theme="dark"] .handsontable .htCore td.confirmed-row .wtHolder {
-  /* darker green tint in dark mode */
-  background-color: #313e31 !important;
-  color: #e6f9ec !important;
-}
-
-/* Ensure checkbox column cells keep no-wrap and center their content */
-.handsontable .htCore td.htCenter {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  white-space: nowrap !important;
-}
-
-.handsontable .htCore td.htCenter input[type="checkbox"] {
-  margin: 0 !important;
-  vertical-align: middle !important;
-}
-
-/* PDF cell with embedded checkbox: text left (ellipsis) and checkbox right */
-.handsontable .htCore td.pdf-with-checkbox {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  padding-right: 0.5rem !important;
-  white-space: nowrap !important;
-}
-
-.pdf-cell-inner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.pdf-cell-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 auto;
-  text-align: left;
-}
-
-.row-confirm-checkbox {
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-/* --- Fortschrittsbalken & Text --- */
-#progress-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 4px;
-  z-index: 10000;
-  display: none;
-  /* Wird per JS eingeblendet */
-}
-
-#progress-bar {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, #4caf50, #81c784);
-  transition: width 0.3s ease-out;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-#progress-text {
-  position: fixed;
-  top: 1.5rem;
-  right: 4.5rem;
   font-family: inherit !important;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-color, #333);
-  background-color: var(--table-page-bg, rgba(255, 255, 255, 0.9));
-  padding: 4px 8px;
-  border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  z-index: 10001;
-  display: none;
+  color: var(--text-color, #ffffff);
+  background-color: var(--button-bg, #5f5f5f);
+  outline: none;
+  cursor: pointer;
 }
 
-[data-theme="dark"] #progress-text {
-  background-color: #3a3a3a;
-  color: #f6f6f6;
+.file-button:hover {
+  background-color: var(--button-hover-bg, #8c8b8b);
 }
 
-[data-theme="light"] .handsontable {
-  color: #000000 !important;
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
 }
 
-[data-theme="light"] .handsontable .htCore td,
-[data-theme="light"] .handsontable .htCore th {
-  color: #000000 !important;
+.btn-primary {
+  background-color: #0f172a;
+  color: white;
 }
 
-[data-theme="light"] .handsontable .wtBorder {
-  background-color: #e0e0e0 !important;
+[data-theme="dark"] .btn-primary {
+  background-color: #0f172a;
 }
 
-.handsontable,
-.handsontable .ht_master,
-.handsontable .wtHolder {
-  background-color: var(--background-color) !important;
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
-[data-theme="light"] .handsontable .htCore td {
-  background-color: var(--table-cell-bg) !important;
+.btn-secondary {
+  background-color: #0f172a7e;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
-:root {
-  --scrollbar-track: transparent;
-  --scrollbar-thumb: #bbbbbb;
-  --scrollbar-thumb-hover: #999999;
+.btn-secondary:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  border-color: #999;
 }
 
-[data-theme="dark"] {
-  --scrollbar-track: transparent;
-  --scrollbar-thumb: #4f4f4f;
-  --scrollbar-thumb-hover: #6f6f6f;
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
-  border-radius: 10px;
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scrollbar-thumb-hover);
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--background-color);
+.btn-ghost:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  opacity: 1;
 }
 
 .fab-button {
@@ -593,6 +236,360 @@ h1 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background-color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+  transform: rotate(15deg);
+}
+
+#settings-btn {
+  position: fixed;
+  top: 1.2rem;
+  right: 1.5rem;
+}
+
+/* --- Theme Toggle --- */
+.theme-toggle {
+  display: flex;
+  align-items: right;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.theme-toggle-input {
+  display: none;
+}
+
+.theme-toggle-label {
+  width: 56px;
+  height: 26px;
+  background-color: #5f5f5f;
+  display: block;
+  border-radius: 25px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  color: #ffffff;
+}
+
+.theme-toggle-inner {
+  width: 20px;
+  height: 20px;
+  background-color: var(--toggle-knob-bg, #fdeed6);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.2, 1);
+  z-index: 1;
+}
+
+.theme-toggle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  display: block;
+  z-index: 2;
+  opacity: 1;
+}
+
+.theme-toggle-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: currentColor;
+}
+
+.theme-toggle-icon-moon {
+  left: 6px;
+}
+.theme-toggle-icon-sun {
+  right: 6px;
+}
+
+.theme-toggle-input:checked + .theme-toggle-label {
+  background-color: #808080;
+}
+
+.theme-toggle-input:checked + .theme-toggle-label .theme-toggle-inner {
+  transform: translateX(29px) translateY(-50%);
+  background-color: #2f2f2f;
+}
+
+[data-theme="light"] .theme-toggle-label {
+  background-color: #2f2f2f;
+  color: var(--background-color);
+}
+
+[data-theme="dark"] .theme-toggle-label {
+  background-color: #968d7e;
+  color: #2f2f2f;
+}
+
+/* --- Navigation --- */
+.sliding-nav {
+  position: relative;
+  display: flex;
+}
+
+.sliding-nav::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  height: 3px;
+  background: var(--text-color, rgb(205, 21, 21));
+  left: var(--underline-left, 0);
+  width: var(--underline-width, 0);
+  transition: left 0.3s ease-out, width 0.3s ease-out;
+}
+
+.sliding-nav button {
+  border: none;
+  background: none;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-color, #ffffff);
+  font-weight: 500;
+  transition: color 0.3s ease-out;
+}
+
+.sliding-nav button.active {
+  color: var(--text-color, #ffffff);
+}
+
+/* --- Handsontable General --- */
+.handsontable,
+.handsontable .htCore {
+  font-family: inherit !important;
+}
+
+.handsontable .htEllipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handsontable .htCore th .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.handsontable .htCore th .header-text {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.handsontable .htCore th .header-confirmed {
+  margin: 0;
+}
+
+.handsontable .htCore td.htCenter {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+.handsontable .htCore td.htCenter input[type="checkbox"] {
+  margin: 0 !important;
+  vertical-align: middle !important;
+}
+
+.handsontable .htCore td.pdf-with-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-right: 0.5rem !important;
+  white-space: nowrap !important;
+}
+
+.pdf-cell-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.pdf-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.row-confirm-checkbox {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.handsontable,
+.handsontable .ht_master,
+.handsontable .wtHolder {
+  background-color: var(--background-color) !important;
+}
+
+[data-theme] .handsontable .htCore td.pdf-group-start {
+  border-top: 15px solid #2f2f2f !important;
+}
+
+/* --- Handsontable Light Mode --- */
+[data-theme="light"] .handsontable .htCore td,
+[data-theme="light"] .handsontable .htCore th {
+  background-color: var(--table-cell-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  color: #000000 !important;
+}
+
+[data-theme="light"] .handsontable .htCore th,
+[data-theme="light"] .handsontable .htCore td:first-child {
+  background-color: var(--table-header-bg) !important;
+  font-weight: 600;
+}
+
+[data-theme="light"] .handsontable .wtBorder {
+  background-color: #e0e0e0 !important;
+}
+
+[data-theme="light"] .handsontable {
+  color: #000000 !important;
+}
+
+/* --- Handsontable Dark Mode --- */
+[data-theme="dark"] .handsontable .htCore td,
+[data-theme="dark"] .handsontable .htCore th {
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background-color: var(--table-cell-bg) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .handsontable .htCore th,
+[data-theme="dark"] .handsontable .htCore td:first-child {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+  font-weight: 600;
+}
+
+/* --- Status Rows (Confirmed & Warning) --- */
+.confirmed-row,
+.handsontable .htCore td.confirmed-row,
+.handsontable .htCore td.confirmed-row .wtHolder {
+  background-color: #d8ffe5 !important;
+}
+
+[data-theme="dark"] .confirmed-row,
+[data-theme="dark"] .handsontable .htCore td.confirmed-row,
+[data-theme="dark"] .handsontable .htCore td.confirmed-row .wtHolder {
+  background-color: #313e31 !important;
+  color: #e6f9ec !important;
+}
+
+.warning-row,
+.handsontable .htCore td.warning-row,
+.handsontable .htCore td.warning-row .wtHolder {
+  background-color: #fff3cd !important;
+}
+
+[data-theme="dark"] .warning-row,
+[data-theme="dark"] .handsontable .htCore td.warning-row,
+[data-theme="dark"] .handsontable .htCore td.warning-row .wtHolder {
+  background-color: #584c24 !important;
+  color: #ffe8b3 !important;
+}
+
+/* --- Progress Bar --- */
+#progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  z-index: 10000;
+  display: none;
+}
+
+#progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4caf50, #81c784);
+  transition: width 0.3s ease-out;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+#progress-text {
+  position: fixed;
+  top: 1.5rem;
+  right: 4.5rem;
+  font-family: inherit !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+  background-color: var(--table-page-bg, rgba(255, 255, 255, 0.9));
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10001;
+  display: none;
+}
+
+[data-theme="dark"] #progress-text {
+  background-color: #3a3a3a;
+  color: #f6f6f6;
+}
+
+/* --- Scrollbars --- */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* --- Toast Notification --- */
 .toast-container {
   position: fixed;
   bottom: 24px;
@@ -634,7 +631,6 @@ h1 {
 
 .toast.error {
   background-color: #e53935;
-  /* Dezentes Rot */
   color: white;
 }
 
@@ -642,32 +638,7 @@ h1 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-[data-theme] .handsontable .htCore td.pdf-group-start {
-  border-top: 15px solid #2f2f2f !important;
-}
-
-.icon-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-color);
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  /* Rund */
-  transition: background-color 0.2s, transform 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-btn:hover {
-  background-color: rgba(128, 128, 128, 0.1);
-  /* Sanfter Hover-Effekt */
-  transform: rotate(15deg);
-  /* Verspielte Rotation beim Hover */
-}
-
-/* Modal Overlay mit Blur-Effekt */
+/* --- Modal & Forms --- */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -676,7 +647,6 @@ h1 {
   height: 100%;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
-  /* Modernes "Milchglas" */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -684,16 +654,13 @@ h1 {
   animation: fadeIn 0.2s;
 }
 
-/* Modal Fenster */
 .modal-content {
   background: var(--background-color);
   color: var(--text-color);
   padding: 30px;
   border-radius: 12px;
-  /* Stärker abgerundet */
   width: 420px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  /* Tieferer Schatten */
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -707,7 +674,6 @@ h1 {
   font-weight: 600;
 }
 
-/* Inputs & Labels */
 .form-group label {
   display: block;
   margin-bottom: 6px;
@@ -722,28 +688,23 @@ h1 {
   border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
-  /* Sollte eine leichte Kontrastfarbe zum BG sein */
   color: var(--text-color);
   font-size: 0.95rem;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
-  /* Wichtig damit Padding nicht die Breite sprengt */
 }
 
 .input-field:focus {
   outline: none;
   border-color: #aecbfa;
-  /* Accent Color (Blau) */
   box-shadow: 0 0 0 3px rgba(21, 43, 78, 0.1);
 }
 
-/* Input Gruppe für Pfad + Button nebeneinander */
 .input-group {
   display: flex;
   gap: 8px;
 }
 
-/* --- Buttons --- */
 .modal-actions {
   margin-top: 10px;
   display: flex;
@@ -751,113 +712,32 @@ h1 {
   gap: 10px;
 }
 
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-/* Primärer Button (Speichern) - Auffällig */
-.btn-primary {
-  background-color: #0f172a;
-  /* Dunkles Blau/Schwarz */
-  color: white;
-}
-
-[data-theme="dark"] .btn-primary {
-  background-color: #0f172a;
-  /* Leuchtendes Blau im Darkmode */
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Sekundärer Button (Wählen) - Dezent */
-.btn-secondary {
-  background-color: #0f172a7e;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-}
-
-.btn-secondary:hover {
-  background-color: rgba(128, 128, 128, 0.1);
-  border-color: #999;
-}
-
-/* Ghost Button (Abbrechen) - Nur Text */
-.btn-ghost {
-  background-color: transparent;
-  color: var(--text-color);
-  opacity: 0.7;
-}
-
-.btn-ghost:hover {
-  background-color: rgba(128, 128, 128, 0.1);
-  opacity: 1;
-}
-
-/* Animation */
 @keyframes fadeIn {
   from {
     opacity: 0;
   }
-
   to {
     opacity: 1;
   }
 }
 
-#settings-btn {
-  position: fixed;
-  top: 1.2rem;
-  right: 1.5rem;
-}
-
-.warning-row {
-  background-color: #fff3cd !important; /* Helles Gelb/Orange für Light Mode */
-}
-
-/* Warning explizit für Handsontable Zellen überschreiben */
-.handsontable .htCore td.warning-row,
-.handsontable .htCore td.warning-row .wtHolder {
-  background-color: #fff3cd !important;
-}
-
-[data-theme="dark"] .warning-row {
-  background-color: #584c24 !important; /* Dunkles Orange/Braun für Dark Mode */
-  color: #ffe8b3 !important; /* Hellerer Text für Kontrast */
-}
-
-[data-theme="dark"] .handsontable .htCore td.warning-row,
-[data-theme="dark"] .handsontable .htCore td.warning-row .wtHolder {
-  background-color: #584c24 !important;
-  color: #ffe8b3 !important;
-}
-
-/* Container für Input + schwebendes Icon */
+/* --- Password Eye --- */
 .password-container {
   position: relative;
   width: 100%;
 }
 
-/* Das Icon selbst */
 .eye-btn {
   position: absolute;
-  right: 10px; /* Abstand vom rechten Rand */
+  right: 10px;
   top: 50%;
-  transform: translateY(-50%); /* Vertikal zentrieren */
+  transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
   padding: 4px;
   color: var(--text-color);
-  opacity: 0.5; /* Dezent halbtransparent */
+  opacity: 0.5;
   transition: opacity 0.2s, color 0.2s;
   display: flex;
   align-items: center;
@@ -865,14 +745,15 @@ h1 {
 }
 
 .eye-btn:hover {
-  opacity: 1; /* Beim Drüberfahren voll sichtbar */
+  opacity: 1;
 }
 
+/* --- Corrections List --- */
 .corrections-container {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background-color: var(--table-bg);
-  max-height: 150px; /* Nicht zu hoch werden lassen */
+  max-height: 150px;
   overflow-y: auto;
   padding: 5px;
 }
@@ -903,7 +784,6 @@ h1 {
   justify-content: center;
 }
 
-/* Der Text-Teil: Pfeil dazwischen */
 .correction-text {
   display: flex;
   gap: 10px;
@@ -912,7 +792,7 @@ h1 {
 }
 
 .correction-wrong {
-  color: #e57373; /* Rotstich für falsch */
+  color: #e57373;
   text-decoration: line-through;
   opacity: 0.8;
   max-width: 120px;
@@ -926,7 +806,7 @@ h1 {
 }
 
 .correction-right {
-  color: #81c784; /* Grünstich für richtig */
+  color: #81c784;
   font-weight: bold;
   max-width: 120px;
   overflow: hidden;
@@ -934,7 +814,6 @@ h1 {
   white-space: nowrap;
 }
 
-/* Löschen Button (kleiner Mülleimer) */
 .delete-correction-btn {
   background: none;
   border: none;
@@ -951,6 +830,6 @@ h1 {
 
 .delete-correction-btn:hover {
   opacity: 1;
-  background-color: rgba(255, 0, 0, 0.1); /* Leichter roter Hintergurnd */
+  background-color: rgba(255, 0, 0, 0.1);
   color: #ff4d4d;
 }

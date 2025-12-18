@@ -47,9 +47,6 @@ interface AiResponse {
   produkte?: AiProduct[];
 }
 
-/**
- * Array storing paths of selected PDF files
- */
 let selectedPdfPaths: string[] = [];
 
 let controller: AbortController | null = null;
@@ -57,9 +54,7 @@ let controller: AbortController | null = null;
 let store: Store | null = null;
 
 let isProcessing = false;
-/**
- * Initialize event listeners when DOM content is loaded
- */
+
 document.addEventListener("DOMContentLoaded", async () => {
   store = await Store.load("settings.json");
   setupProgressBar();
@@ -111,10 +106,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // Call the function to set the initial state of the button
   updateStartProcessButtonState();
 
-  // Add event listener to update the button state when the table content changes
   const dataGrid = document.querySelector("#data-grid") as HTMLElement;
   const observer = new MutationObserver(() => {
     updateStartProcessButtonState();
@@ -327,9 +320,6 @@ async function loadPdfsFromDirectory(path: string) {
   }
 }
 
-/**
- * Handle PDF file selection via file dialog
- */
 async function handleSelectFiles() {
   if (isProcessing) return;
   const result = await open({
@@ -354,9 +344,6 @@ async function handleSelectFiles() {
   updateFileUI();
 }
 
-/**
- * Handle folder selection and filter PDF files
- */
 async function handleSelectFolder() {
   if (isProcessing) return;
   const result = await open({
@@ -370,9 +357,6 @@ async function handleSelectFolder() {
   }
 }
 
-/**
- * Erstellt Balken UND Text-Anzeige im DOM
- */
 function setupProgressBar() {
   if (!document.getElementById("progress-container")) {
     const container = document.createElement("div");
@@ -388,11 +372,6 @@ function setupProgressBar() {
   }
 }
 
-/**
- * Aktualisiert Balken und Text.
- * @param current Anzahl der ERLEDIGTEN Dateien
- * @param total Gesamtanzahl
- */
 function setProgress(current: number, total: number) {
   const container = document.getElementById("progress-container");
   const bar = document.getElementById("progress-bar");
@@ -657,10 +636,6 @@ function updateFileUI() {
   hot.loadData([...currentData, ...newRows]);
 }
 
-/**
- * Renderer for the PDF name column that places the filename (left) and a checkbox (right).
- * The checkbox stays in sync with the row's `confirmed` property.
- */
 function pdfNameRenderer(
   this: Handsontable.Core,
   _instance: Handsontable.Core,
@@ -671,10 +646,8 @@ function pdfNameRenderer(
   value: Handsontable.CellValue,
   _cellProperties: Handsontable.CellProperties
 ) {
-  // Keep base text rendering (for things like selection styling)
   Handsontable.renderers.TextRenderer.apply(this, arguments as any);
 
-  // Ensure tooltip/title for full value
   if (value !== null && value !== undefined) td.title = String(value);
 
   td.classList.add("pdf-with-checkbox");
@@ -707,9 +680,6 @@ function pdfNameRenderer(
   td.appendChild(wrapper);
 }
 
-/**
- * Custom renderer for ellipsis in table cells
- */
 function ellipsisRenderer(
   this: Handsontable.Core,
   _instance: Handsontable.Core,
@@ -727,9 +697,6 @@ function ellipsisRenderer(
   }
 }
 
-/**
- * Update the header checkbox state (checked / indeterminate) based on row data
- */
 function updateHeaderCheckboxState() {
   if (!hot) return;
   const cbs = Array.from(
@@ -768,15 +735,11 @@ function updateHeaderCheckboxState() {
   }
 }
 
-/**
- * Injects a checkbox into the header cell at index 1 and wires its behaviour
- */
 function setupHeaderCheckbox() {
   if (!hot) return;
   const container = document.querySelector("#data-grid") as HTMLElement | null;
   if (!container) return;
 
-  // Handsontable renders header clones; attempt to find both top and master header cells
   const selectors = [
     ".ht_clone_top .htCore thead th:nth-child(1)",
     ".ht_master .htCore thead th:nth-child(1)",
@@ -790,18 +753,13 @@ function setupHeaderCheckbox() {
   }
 
   if (headerCells.length === 0) {
-    // header not ready yet — try again on next frame
     requestAnimationFrame(setupHeaderCheckbox);
     return;
   }
 
-  // Inject a separate checkbox into each found header cell (keep them in sync via updateHeaderCheckboxState)
   headerCells.forEach((th) => {
-    // Avoid re-injecting
     if (th.querySelector(".header-confirmed")) return;
 
-    // Preserve header text and insert checkbox aligned to the right
-    // Avoid re-injecting if header already contains our wrapper
     if (th.querySelector(".header-content")) return;
 
     const existingText = th.textContent ? th.textContent.trim() : "";
@@ -844,14 +802,8 @@ function setupHeaderCheckbox() {
   updateHeaderCheckboxState();
 }
 
-/**
- * Handsontable instance for data grid
- */
 let hot: Handsontable | null = null;
 
-/**
- * Initialize Handsontable data grid
- */
 document.addEventListener("DOMContentLoaded", () => {
   const container = document.querySelector("#data-grid");
   if (!container) return;
@@ -1092,9 +1044,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 200);
 });
 
-/**
- * Toggle between light and dark themes
- */
 function toggleTheme() {
   const themeToggle = document.querySelector(
     "#theme-toggle-input"
@@ -1165,11 +1114,6 @@ async function handleExportExcel() {
   }
 }
 
-/**
- * Zeigt ein minimalistisches Pop-Up (Toast) an.
- * @param text Nachricht
- * @param type 'success' | 'error' | 'info'
- */
 function showToast(text: string, type: "success" | "error" | "info" = "info") {
   let container = document.getElementById("toast-container");
   if (!container) {
