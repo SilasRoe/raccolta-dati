@@ -5,7 +5,7 @@
 </head>
 <body>
 
-This template should help get you started developing with Tauri in vanilla HTML, CSS and Typescript.
+<h1>Raccolta Dati</h1>
 
 <p>
     <strong>Raccolta Dati</strong> is a desktop application based on <strong>Tauri</strong> and <strong>Vanilla TypeScript</strong> that specializes in extracting data from PDF documents (order confirmations and invoices) using AI and processing it in a tabular overview.
