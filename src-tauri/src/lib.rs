@@ -97,7 +97,7 @@ fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
         .to_string()
 }
 
-const KEYRING_SERVICE: &str = "com.silas.raccolta_dati";
+const KEYRING_SERVICE: &str = "com.silas.maggus";
 const KEYRING_USER: &str = "mistral_api_key";
 
 #[command]

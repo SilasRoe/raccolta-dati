@@ -1,5 +1,5 @@
 {
-  "name": "raccolta_dati",
+  "name": "maggus",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,22 +10,22 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@mistralai/mistralai": "1.11.0",
-    "@tauri-apps/api": "^2.9.1",
-    "@tauri-apps/plugin-dialog": "^2.5.0",
-    "@tauri-apps/plugin-fs": "^2.4.5",
-    "@tauri-apps/plugin-opener": "^2.5.3",
-    "@tauri-apps/plugin-shell": "^2.3.4",
-    "@tauri-apps/plugin-store": "^2.4.2",
-    "handsontable": "^16.2.0",
+    "@mistralai/mistralai": "^1.10.0",
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4",
+    "@tauri-apps/plugin-opener": "^2.5.2",
+    "@tauri-apps/plugin-shell": "^2.3.3",
+    "@tauri-apps/plugin-store": "^2.4.1",
+    "handsontable": "^16.1.1",
     "lodash": "^4.17.21",
-    "pdfjs-dist": "^5.4.530"
+    "pdfjs-dist": "^5.4.449"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.9.6",
-    "@types/lodash": "^4.17.23",
-    "@types/node": "^25.0.6",
-    "typescript": "~5.9.3",
-    "vite": "7.3.1"
+    "@tauri-apps/cli": "^2",
+    "@types/lodash": "^4.17.21",
+    "@types/node": "^24.10.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
   }
 }
