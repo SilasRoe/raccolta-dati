@@ -744,6 +744,38 @@ async fn learn_correction(
     Ok(())
 }
 
+#[command]
+async fn move_files(paths: Vec<String>, target_dir: String) -> Result<(), String> {
+    if target_dir.trim().is_empty() {
+        return Ok(());
+    }
+
+    let dest_path = std::path::Path::new(&target_dir);
+    if !dest_path.exists() {
+        fs::create_dir_all(dest_path)
+            .map_err(|e| format!("Impossibile creare la cartella: {}", e))?;
+    }
+
+    for path_str in paths {
+        let source_path = std::path::Path::new(&path_str);
+        if source_path.exists() {
+            let file_name = source_path.file_name().ok_or("Nome file non valido")?;
+            let mut target_path = dest_path.join(file_name);
+
+            if target_path.exists() {
+                let stem = source_path.file_stem().unwrap().to_string_lossy();
+                let ext = source_path.extension().unwrap().to_string_lossy();
+                let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                target_path = dest_path.join(format!("{}_{}.{}", stem, timestamp, ext));
+            }
+
+            fs::rename(source_path, target_path)
+                .map_err(|e| format!("Errore durante lo spostamento di {}: {}", path_str, e))?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -759,7 +791,8 @@ pub fn run() {
             get_api_key,
             learn_correction,
             get_corrections,
-            remove_correction
+            remove_correction,
+            move_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -160,6 +160,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const excelPathInput = document.getElementById(
     "setting-excel-path"
   ) as HTMLInputElement;
+  const processedPathInput = document.getElementById(
+    "setting-processed-pdf-path"
+  ) as HTMLInputElement;
 
   const toggleApiKeyBtn = document.getElementById("toggle-api-key-btn");
 
@@ -201,23 +204,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (typeof selected === "string") excelPathInput.value = selected;
     });
 
+  document
+    .getElementById("setting-select-processed-pdf")
+    ?.addEventListener("click", async () => {
+      const selected = await open({ directory: true });
+      if (typeof selected === "string") processedPathInput.value = selected;
+    });
+
   settingsBtn?.addEventListener("click", async () => {
-    const [apiKey, pdfPath, excelPath, theme] = await Promise.all([
-      invoke<string>("get_api_key").catch((err) => {
-        console.warn(
-          "Impossibile caricare la chiave API (forse al primo avvio):",
-          err
-        );
-        return "";
-      }),
-      store?.get("defaultPdfPath").catch(() => null),
-      store?.get("defaultExcelPath").catch(() => null),
-      store?.get("defaultTheme").catch(() => null),
-    ]);
+    const [apiKey, pdfPath, excelPath, processedPath, theme] =
+      await Promise.all([
+        invoke<string>("get_api_key").catch((err) => {
+          console.warn(
+            "Impossibile caricare la chiave API (forse al primo avvio):",
+            err
+          );
+          return "";
+        }),
+        store?.get("defaultPdfPath").catch(() => null),
+        store?.get("defaultExcelPath").catch(() => null),
+        store?.get("defaultProcessedPdfPath").catch(() => null),
+        store?.get("defaultTheme").catch(() => null),
+      ]);
 
     if (apiKeyInput) apiKeyInput.value = apiKey || "";
     if (pdfPathInput) pdfPathInput.value = (pdfPath as string) || "";
     if (excelPathInput) excelPathInput.value = (excelPath as string) || "";
+    if (processedPathInput)
+      processedPathInput.value = (processedPath as string) || "";
     if (theme) themeToggle.checked = theme === "light";
 
     loadAndRenderCorrections();
@@ -235,6 +249,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       await store?.set("defaultPdfPath", pdfPathInput.value);
       await store?.set("defaultExcelPath", excelPathInput.value);
+      await store?.set("defaultProcessedPdfPath", processedPathInput.value);
       const newTheme = themeToggle.checked ? "light" : "dark";
       await store?.set("defaultTheme", newTheme);
 
@@ -1091,8 +1106,16 @@ async function handleExportExcel() {
   const allData = hot.getSourceData() as PdfDataRow[];
   const confirmedData = allData.filter((row) => row.confirmed);
 
+  const pathsToMove = new Set<string>();
+  confirmedData.forEach((row) => {
+    if (row.fullPath && !row.warnings && row.produkt) {
+      pathsToMove.add(row.fullPath);
+    }
+  });
+
   if (confirmedData.length === 0) {
     showToast("Nessuna riga confermata per l'esportazione.", "info");
+    isProcessing = false;
     return;
   }
 
@@ -1110,15 +1133,26 @@ async function handleExportExcel() {
       }
     );
 
-    const defaultExcelPath = await store?.get<string>("defaultExcelPath");
-
     const msg = await invoke<string>("export_to_excel", {
       data: confirmedData,
-      filePath: defaultExcelPath || null,
+      filePath: (await store?.get<string>("defaultExcelPath")) || null,
     });
 
-    if (msg !== "Demolizione") {
+    if (msg !== "Interruzione da parte dell'utente") {
       showToast(msg, "success");
+
+      const processedDir = await store?.get<string>("defaultProcessedPdfPath");
+      if (processedDir && pathsToMove.size > 0) {
+        try {
+          await invoke("move_files", {
+            paths: Array.from(pathsToMove),
+            targetDir: processedDir,
+          });
+          showToast(`${pathsToMove.size} PDF spostati.`, "success");
+        } catch (moveErr) {
+          showToast(`Errore durante lo spostamento: ${moveErr}`, "error");
+        }
+      }
     }
 
     isProcessing = false;
