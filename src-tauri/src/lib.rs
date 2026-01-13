@@ -185,7 +185,7 @@ async fn export_to_excel(
     };
     let path = path_buf.as_path();
 
-    if let Err(_) = OpenOptions::new().write(true).append(true).open(path) {
+    if let Err(_) = OpenOptions::new().write(true).open(path) {
         return Err("Accesso negato! Il file è aperto.".to_string());
     }
 
