@@ -66,6 +66,9 @@
     <li><strong>Create production build:</strong>
         <pre><code>npm run tauri build</code></pre>
     </li>
+    <li><strong>Path to the installation file:</strong>
+        <pre><code>.\src-tauri\target\release\bundle</code></pre>
+    </li>
 </ol>
 
 <h2>Configuration</h2>
