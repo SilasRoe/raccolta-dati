@@ -258,6 +258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.documentElement.setAttribute("data-theme", newTheme);
 
       settingsModal!.style.display = "none";
+      window.location.reload();
       showToast("Impostazioni salvate", "success");
     } catch (err) {
       console.error("Errore durante il salvataggio:", err);
