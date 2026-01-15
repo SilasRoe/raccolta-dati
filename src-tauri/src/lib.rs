@@ -39,6 +39,7 @@ struct ExportRow {
 struct SheetRow {
     row_idx: u32,
     supplier: String,
+    order_number: String,
     date: NaiveDate,
 }
 
@@ -76,6 +77,9 @@ async fn remove_correction(app: tauri::AppHandle, wrong: String) -> Result<(), S
 }
 
 fn parse_date(date_str: &str) -> Option<NaiveDate> {
+    if let Ok(d) = NaiveDate::parse_from_str(date_str, "%d/%m/%Y") {
+        return Some(d);
+    }
     if let Ok(d) = NaiveDate::parse_from_str(date_str, "%d.%m.%Y") {
         return Some(d);
     }
@@ -88,6 +92,23 @@ fn parse_date(date_str: &str) -> Option<NaiveDate> {
         return base.checked_add_signed(chrono::Duration::days(days));
     }
     None
+}
+
+fn format_to_uppercase(v: &mut Value) {
+    match v {
+        Value::String(s) => *v = json!(s.to_uppercase()),
+        Value::Array(arr) => {
+            for item in arr {
+                format_to_uppercase(item);
+            }
+        }
+        Value::Object(obj) => {
+            for val in obj.values_mut() {
+                format_to_uppercase(val);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn adjust_formula(formula: &str, old_row: u32, new_row: u32) -> String {
@@ -216,12 +237,14 @@ async fn export_to_excel(
 
     if highest_row >= start_data_row {
         for r in start_data_row..=highest_row {
-            let s_val = sheet.get_value((4, r));
+            let s_val = sheet.get_value((4, r)).to_lowercase();
             let d_val = sheet.get_value((1, r));
+            let o_val = sheet.get_value((2, r)).to_string().trim().to_lowercase();
 
             existing_rows_for_sorting.push(SheetRow {
                 row_idx: r,
-                supplier: s_val.to_lowercase(),
+                supplier: s_val,
+                order_number: o_val,
                 date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
             });
 
@@ -320,16 +343,45 @@ async fn export_to_excel(
 
     if !rows_to_insert.is_empty() {
         rows_to_insert.sort_by(|a, b| {
-            let date_a = parse_date(&a.datum_auftrag.clone().unwrap_or_default());
-            let date_b = parse_date(&b.datum_auftrag.clone().unwrap_or_default());
+            let res = a
+                .lieferant
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .cmp(&b.lieferant.as_deref().unwrap_or("").to_lowercase());
+            if res != std::cmp::Ordering::Equal {
+                return res;
+            }
+
+            let res = a
+                .nummer_auftrag
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .cmp(&b.nummer_auftrag.as_deref().unwrap_or("").to_lowercase());
+            if res != std::cmp::Ordering::Equal {
+                return res;
+            }
+
+            let date_a = parse_date(a.datum_auftrag.as_deref().unwrap_or_default());
+            let date_b = parse_date(b.datum_auftrag.as_deref().unwrap_or_default());
             date_a.cmp(&date_b)
         });
 
         let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
 
         for new_row in rows_to_insert.iter() {
-            let target_supplier = new_row.lieferant.clone().unwrap_or_default().to_lowercase();
-            let target_date = parse_date(&new_row.datum_auftrag.clone().unwrap_or_default())
+            let target_supplier = new_row
+                .lieferant
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase();
+            let target_order = new_row
+                .nummer_auftrag
+                .as_deref()
+                .unwrap_or_default()
+                .to_lowercase();
+            let target_date = parse_date(new_row.datum_auftrag.as_deref().unwrap_or_default())
                 .unwrap_or(NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
 
             let mut insert_at = sheet.get_highest_row() + 1;
@@ -341,7 +393,10 @@ async fn export_to_excel(
             for ex in &existing_rows_for_sorting {
                 if ex.supplier == target_supplier {
                     found_supplier_block = true;
-                    if ex.date > target_date {
+                    if ex.order_number > target_order {
+                        insert_at = ex.row_idx;
+                        break;
+                    } else if ex.order_number == target_order && ex.date > target_date {
                         insert_at = ex.row_idx;
                         break;
                     }
@@ -647,18 +702,19 @@ async fn analyze_document(
     };
 
     let full_prompt = format!(
-        "{}\n\nWICHTIGE LAYOUT-INFO: {}\n\nDokument Inhalt:\n{}",
+        "{}\n\nIMPORTANT LAYOUT-INFORMATION: {}\n\nContent document:\n{}",
         base_prompt, layout_instruction, extracted_text
     );
 
     let mut result_obj = call_llm(&client, &api_key, &full_prompt).await?;
+    format_to_uppercase(&mut result_obj);
 
     if !products_non_empty(&result_obj) {
         if !used_ocr {
             if let Ok(layout_text) = run_sidecar(&app, &path, true).await {
                 if layout_text.trim().len() > 50 {
                     let retry_prompt = format!(
-                        "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS LAYOUT. Preserve original PDF layout.\n\nDokument Inhalt:\n{}",
+                        "{}\n\nIMPORTANT LAYOUT-INFORMATION: THE LAYOUT IS LAYOUT. Preserve original PDF layout.\n\nContent document:\n{}",
                         base_prompt, layout_text
                     );
 
@@ -674,7 +730,7 @@ async fn analyze_document(
                 match perform_ocr_with_retry(&client, &api_key, &path).await {
                     Ok(ocr_text) => {
                         let retry_prompt = format!(
-                            "{}\n\nWICHTIGE LAYOUT-INFO: THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure.\n\nDokument Inhalt:\n{}",
+                            "{}\n\nIMPORTANT LAYOUT-INFORMATION: THE LAYOUT IS MARKDOWN. Tables are marked with pipes '|'. Use this structure.\n\nContent document:\n{}",
                             base_prompt, ocr_text
                         );
                         if let Ok(parsed) = call_llm(&client, &api_key, &retry_prompt).await {

@@ -579,7 +579,7 @@ function parseDateStrings(dateString: string) {
     const year = dateString.substring(0, 4);
     const month = dateString.substring(4, 6);
     const day = dateString.substring(6, 8);
-    date = `${day}.${month}.${year}`;
+    date = `${day}/${month}/${year}`;
   }
   return date || null;
 }
@@ -668,7 +668,29 @@ function updateFileUI() {
     })
     .filter((row): row is PdfDataRow => row !== null);
 
-  hot.loadData([...currentData, ...newRows]);
+  const allData = [...currentData, ...newRows];
+
+  allData.sort((a, b) => {
+    const compLieferant = (a.lieferant || "").localeCompare(b.lieferant || "");
+    if (compLieferant !== 0) return compLieferant;
+
+    const compOrder = (a.nummerAuftrag || "").localeCompare(
+      b.nummerAuftrag || "",
+      undefined,
+      { numeric: true }
+    );
+    if (compOrder !== 0) return compOrder;
+
+    const dateA = a.datumAuftrag
+      ? a.datumAuftrag.split("/").reverse().join("-")
+      : "";
+    const dateB = b.datumAuftrag
+      ? b.datumAuftrag.split("/").reverse().join("-")
+      : "";
+    return dateA.localeCompare(dateB);
+  });
+
+  hot.loadData(allData);
 }
 
 function pdfNameRenderer(
@@ -873,8 +895,8 @@ document.addEventListener("DOMContentLoaded", () => {
       {
         data: "datumAuftrag",
         type: "date",
-        dateFormat: "DD.MM.YYYY",
-        dateFormats: ["DD.MM.YYYY"],
+        dateFormat: "DD/MM/YYYY",
+        dateFormats: ["DD/MM/YYYY"],
         correctFormat: true,
         width: 60,
       },
@@ -893,8 +915,8 @@ document.addEventListener("DOMContentLoaded", () => {
       {
         data: "datumRechnung",
         type: "date",
-        dateFormat: "DD.MM.YYYY",
-        dateFormats: ["DD.MM.YYYY"],
+        dateFormat: "DD/MM/YYYY",
+        dateFormats: ["DD/MM/YYYY"],
         correctFormat: true,
         width: 60,
       },
