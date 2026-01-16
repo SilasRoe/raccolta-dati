@@ -430,6 +430,16 @@ button:disabled {
   white-space: nowrap !important;
 }
 
+[data-theme="light"] .htContextMenu table tbody tr td.current,
+[data-theme="light"] .htContextMenu table tbody tr td:not(.htSeparator):hover {
+  color: #a3a3a3 !important;
+}
+
+[data-theme="dark"] .htContextMenu table tbody tr td.current,
+[data-theme="dark"] .htContextMenu table tbody tr td:not(.htSeparator):hover {
+  color: #494949 !important;
+}
+
 .pdf-cell-inner {
   display: flex;
   align-items: center;
@@ -832,54 +842,4 @@ button:disabled {
   opacity: 1;
   background-color: rgba(255, 0, 0, 0.1);
   color: #ff4d4d;
-}
-
-.htContextMenu,
-.htDropdownMenu {
-  background-color: #ffffff !important;
-  border: 1px solid #ccc !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
-}
-
-.htContextMenu table tbody tr td,
-.htDropdownMenu table tbody tr td {
-  background-color: #ffffff !important;
-  color: #333333 !important;
-  border-color: #ffffff !important;
-}
-
-.htContextMenu table tbody tr td.htHover,
-.htContextMenu table tbody tr td:hover,
-.htDropdownMenu table tbody tr td.htHover,
-.htDropdownMenu table tbody tr td:hover {
-  background-color: #e6e6e6 !important;
-  color: #000000 !important;
-  cursor: pointer;
-}
-
-.htContextMenu table tbody tr td.htDisabled,
-.htContextMenu table tbody tr td.htDisabled:hover,
-.htDropdownMenu table tbody tr td.htDisabled,
-.htDropdownMenu table tbody tr td.htDisabled:hover {
-  background-color: #ffffff !important;
-  color: #b0b0b0 !important;
-  cursor: default;
-}
-
-.htContextMenu table tbody tr td.htSeparator,
-.htDropdownMenu table tbody tr td.htSeparator {
-  border-top: 1px solid #e0e0e0 !important;
-  background-color: transparent !important;
-  height: 0 !important;
-  padding: 0 !important;
-  margin: 4px 0 !important;
-}
-
-.htContextMenu table tbody tr td .htSubmenu,
-.htDropdownMenu table tbody tr td .htSubmenu {
-  color: #333333 !important;
-}
-.htContextMenu table tbody tr td.htHover .htSubmenu,
-.htDropdownMenu table tbody tr td.htHover .htSubmenu {
-  color: #000000 !important;
 }
