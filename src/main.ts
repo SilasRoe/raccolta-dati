@@ -538,6 +538,7 @@ async function handleReseachStart() {
           } else {
             newRow.gelieferteMenge = prod.gelieferteMenge;
             newRow.nummerRechnung = aiResult.nummerRechnung;
+            newRow.preis = prod.preis;
           }
 
           newTableData.push(newRow);
@@ -1303,6 +1304,8 @@ async function reAnalyzeRow(row: number) {
       hot.batch(() => {
         const firstProd = products[0];
 
+        hot!.setDataAtRowProp(row, "produkt", firstProd.produkt);
+
         if (rowData.docType === "auftrag") {
           hot!.setDataAtRowProp(row, "menge", firstProd.menge);
           hot!.setDataAtRowProp(row, "waehrung", firstProd.waehrung);
@@ -1314,10 +1317,11 @@ async function reAnalyzeRow(row: number) {
             firstProd.gelieferteMenge
           );
           hot!.setDataAtRowProp(row, "nummerRechnung", result.nummerRechnung);
+          hot!.setDataAtRowProp(row, "preis", firstProd.preis);
         }
-        hot!.setDataAtRowProp(row, "produkt", firstProd.produkt);
 
         hot!.setDataAtRowProp(row, "anmerkungen", "");
+
         if (products.length > 1) {
           const extraProducts = products.slice(1);
           hot!.alter("insert_row_below", row, extraProducts.length);
@@ -1342,6 +1346,7 @@ async function reAnalyzeRow(row: number) {
                 "nummerRechnung",
                 result.nummerRechnung
               );
+              hot!.setDataAtRowProp(newRowIdx, "preis", prod.preis);
             }
           });
         }

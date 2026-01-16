@@ -4,7 +4,7 @@ use dotenv::dotenv;
 use keyring::Entry;
 use regex::Regex;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::fs::OpenOptions;
@@ -41,6 +41,34 @@ struct SheetRow {
     supplier: String,
     order_number: String,
     date: NaiveDate,
+}
+
+fn tokenize(s: &str) -> HashSet<String> {
+    s.split_whitespace()
+        .map(|w| {
+            w.trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase()
+        })
+        .filter(|w| !w.is_empty())
+        .collect()
+}
+
+fn token_similarity(s1: &str, s2: &str) -> f64 {
+    let t1 = tokenize(s1);
+    let t2 = tokenize(s2);
+
+    if t1.is_empty() || t2.is_empty() {
+        return 0.0;
+    }
+
+    let intersection_count = t1.intersection(&t2).count();
+    let union_count = t1.union(&t2).count();
+
+    if union_count == 0 {
+        return 0.0;
+    }
+
+    intersection_count as f64 / union_count as f64
 }
 
 #[command]
@@ -183,12 +211,18 @@ async fn get_api_key() -> Result<String, String> {
 #[command]
 async fn export_to_excel(
     app: tauri::AppHandle,
-    data: Vec<ExportRow>,
+    mut data: Vec<ExportRow>,
     file_path: Option<String>,
 ) -> Result<String, String> {
     if data.is_empty() {
         return Err("Nessun dato selezionato.".to_string());
     }
+
+    data.sort_by(|a, b| {
+        let a_is_invoice = a.gelieferte_menge.is_some();
+        let b_is_invoice = b.gelieferte_menge.is_some();
+        a_is_invoice.cmp(&b_is_invoice)
+    });
 
     let path_buf = if let Some(p) = file_path {
         PathBuf::from(p)
@@ -221,7 +255,6 @@ async fn export_to_excel(
 
     let mut header_row = 1;
     let search_limit = if highest_row < 100 { highest_row } else { 100 };
-
     for r in 1..=search_limit {
         let cell_val = sheet.get_value((4, r));
         if cell_val.trim().eq_ignore_ascii_case("Casa Estera") {
@@ -229,10 +262,16 @@ async fn export_to_excel(
             break;
         }
     }
-
     let start_data_row = header_row + 1;
 
-    let mut index_map: HashMap<(String, String), u32> = HashMap::new();
+    struct ExcelCandidate {
+        row_idx: u32,
+        product_norm: String,
+        qty: f64,
+        price: f64,
+    }
+
+    let mut order_map: HashMap<String, Vec<ExcelCandidate>> = HashMap::new();
     let mut existing_rows_for_sorting: Vec<SheetRow> = Vec::with_capacity(highest_row as usize);
 
     if highest_row >= start_data_row {
@@ -240,78 +279,87 @@ async fn export_to_excel(
             let s_val = sheet.get_value((4, r)).to_lowercase();
             let d_val = sheet.get_value((1, r));
             let o_val = sheet.get_value((2, r)).to_string().trim().to_lowercase();
+            let p_name = sheet.get_value((5, r)).to_string();
+
+            let qty_val = sheet.get_value((6, r)).parse::<f64>().unwrap_or(0.0);
+            let price_val = sheet.get_value((8, r)).parse::<f64>().unwrap_or(0.0);
 
             existing_rows_for_sorting.push(SheetRow {
                 row_idx: r,
                 supplier: s_val,
-                order_number: o_val,
+                order_number: o_val.clone(),
                 date: parse_date(&d_val).unwrap_or(NaiveDate::from_ymd_opt(2200, 1, 1).unwrap()),
             });
 
-            let auftrag_nr = sheet.get_value((2, r)).to_string().trim().to_lowercase();
-            let produkt = sheet.get_value((5, r)).to_string().trim().to_lowercase();
-
-            if !auftrag_nr.is_empty() && !produkt.is_empty() {
-                index_map.insert((auftrag_nr, produkt), r);
+            if !o_val.is_empty() {
+                order_map.entry(o_val).or_default().push(ExcelCandidate {
+                    row_idx: r,
+                    product_norm: p_name,
+                    qty: qty_val,
+                    price: price_val,
+                });
             }
         }
     }
-
-    let mut merged_input_map: HashMap<(String, String), ExportRow> = HashMap::new();
-    let mut unmatchable_rows: Vec<ExportRow> = Vec::new();
-
-    for row in data {
-        if let (Some(nr), Some(prod)) = (&row.nummer_auftrag, &row.produkt) {
-            let key = (nr.trim().to_lowercase(), prod.trim().to_lowercase());
-
-            if let Some(existing) = merged_input_map.get_mut(&key) {
-                if existing.datum_rechnung.is_none() {
-                    existing.datum_rechnung = row.datum_rechnung;
-                }
-                if existing.nummer_rechnung.is_none() {
-                    existing.nummer_rechnung = row.nummer_rechnung;
-                }
-                if existing.gelieferte_menge.is_none() {
-                    existing.gelieferte_menge = row.gelieferte_menge;
-                }
-                if existing.preis.is_none() {
-                    existing.preis = row.preis;
-                }
-                if existing.menge.is_none() {
-                    existing.menge = row.menge;
-                }
-            } else {
-                merged_input_map.insert(key, row);
-            }
-        } else {
-            unmatchable_rows.push(row);
-        }
-    }
-
-    let mut processing_queue: Vec<ExportRow> = merged_input_map.into_values().collect();
-    processing_queue.append(&mut unmatchable_rows);
-
-    let total_ops = processing_queue.len();
-    let mut current_progress = 0;
 
     let mut rows_to_insert: Vec<ExportRow> = Vec::new();
     let mut updated_count = 0;
 
-    for row in processing_queue {
-        let key = (
-            row.nummer_auftrag
-                .clone()
-                .unwrap_or_default()
-                .trim()
-                .to_lowercase(),
-            row.produkt
-                .clone()
-                .unwrap_or_default()
-                .trim()
-                .to_lowercase(),
-        );
+    let total_ops = data.len();
+    let mut current_progress = 0;
 
-        if let Some(&row_idx) = index_map.get(&key) {
+    for row in data {
+        let order_nr = row
+            .nummer_auftrag
+            .clone()
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase();
+        let prod_name = row.produkt.clone().unwrap_or_default();
+
+        let mut best_match_excel: Option<u32> = None;
+        let mut best_score_excel: f64 = -1.0;
+
+        if let (Some(inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
+            if let Some(candidates) = order_map.get(&order_nr) {
+                for cand in candidates {
+                    if (cand.price - inv_price).abs() > 0.05 {
+                        continue;
+                    }
+
+                    let qty_diff_abs = (cand.qty - inv_qty).abs();
+                    let qty_diff_rel = if cand.qty > 0.0 {
+                        qty_diff_abs / cand.qty
+                    } else {
+                        1.0
+                    };
+
+                    if qty_diff_rel > 0.5 {
+                        continue;
+                    }
+
+                    let name_sim = token_similarity(&prod_name, &cand.product_norm);
+                    let qty_score = (1.0 - qty_diff_rel).max(0.0);
+                    let total_score = (qty_score * 10.0) + (name_sim * 5.0);
+
+                    if total_score > best_score_excel {
+                        best_score_excel = total_score;
+                        best_match_excel = Some(cand.row_idx);
+                    }
+                }
+            }
+        } else {
+            if let Some(candidates) = order_map.get(&order_nr) {
+                if let Some(exact) = candidates
+                    .iter()
+                    .find(|c| c.product_norm.trim().eq_ignore_ascii_case(prod_name.trim()))
+                {
+                    best_match_excel = Some(exact.row_idx);
+                }
+            }
+        }
+
+        if let Some(row_idx) = best_match_excel {
             if let Some(v) = &row.datum_rechnung {
                 sheet.get_cell_mut((10, row_idx)).set_value(v);
             }
@@ -328,16 +376,83 @@ async fn export_to_excel(
                 }
             }
             updated_count += 1;
-
-            current_progress += 1;
-            if current_progress % 10 == 0 || current_progress == total_ops {
-                let _ = app.emit(
-                    "excel-progress",
-                    json!({ "current": current_progress, "total": total_ops }),
-                );
-            }
         } else {
-            rows_to_insert.push(row);
+            let mut found_in_pending = false;
+
+            if let (Some(inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
+                let mut best_idx_pending = None;
+                let mut best_score_pending = -1.0;
+
+                for (idx, pending) in rows_to_insert.iter().enumerate() {
+                    if pending.gelieferte_menge.is_some() {
+                        continue;
+                    }
+
+                    let pending_nr = pending
+                        .nummer_auftrag
+                        .as_deref()
+                        .unwrap_or("")
+                        .trim()
+                        .to_lowercase();
+                    if pending_nr != order_nr {
+                        continue;
+                    }
+
+                    let pending_price = pending.preis.unwrap_or(0.0);
+                    if (pending_price - inv_price).abs() > 0.05 {
+                        continue;
+                    }
+
+                    let pending_qty = pending.menge.unwrap_or(0.0);
+                    let qty_diff_abs = (pending_qty - inv_qty).abs();
+                    let qty_diff_rel = if pending_qty > 0.0 {
+                        qty_diff_abs / pending_qty
+                    } else {
+                        1.0
+                    };
+
+                    if qty_diff_rel > 0.5 {
+                        continue;
+                    }
+
+                    let pending_name = pending.produkt.as_deref().unwrap_or("");
+                    let name_sim = token_similarity(&prod_name, pending_name);
+
+                    let qty_score = (1.0 - qty_diff_rel).max(0.0);
+                    let total_score = (qty_score * 10.0) + (name_sim * 5.0);
+
+                    if total_score > best_score_pending {
+                        best_score_pending = total_score;
+                        best_idx_pending = Some(idx);
+                    }
+                }
+
+                if let Some(idx) = best_idx_pending {
+                    let target = &mut rows_to_insert[idx];
+                    target.datum_rechnung = row.datum_rechnung.clone();
+                    target.nummer_rechnung = row.nummer_rechnung.clone();
+                    target.gelieferte_menge = Some(inv_qty);
+                    if let Some(note) = &row.anmerkungen {
+                        if target.anmerkungen.is_none() {
+                            target.anmerkungen = Some(note.clone());
+                        }
+                    }
+                    found_in_pending = true;
+                    updated_count += 1;
+                }
+            }
+
+            if !found_in_pending {
+                rows_to_insert.push(row);
+            }
+        }
+
+        current_progress += 1;
+        if current_progress % 10 == 0 {
+            let _ = app.emit(
+                "excel-progress",
+                json!({ "current": current_progress, "total": total_ops }),
+            );
         }
     }
 
@@ -479,12 +594,13 @@ async fn export_to_excel(
                 for col in 1..=18 {
                     if let Some(style) = column_styles.get((col - 1) as usize) {
                         let mut s = style.clone();
+                        let alignment = s.get_alignment_mut();
+                        alignment.set_wrap_text(false);
 
                         if col == 1 || col == 10 {
-                            s.get_alignment_mut()
+                            alignment
                                 .set_horizontal(umya_spreadsheet::HorizontalAlignmentValues::Right);
                         }
-
                         sheet.set_style((col, r), s);
                     }
                 }
@@ -492,14 +608,6 @@ async fn export_to_excel(
                 if !template_formula.is_empty() {
                     let new_formula = adjust_formula(&template_formula, formula_source_row, r);
                     sheet.get_cell_mut((13, r)).set_formula(new_formula);
-                }
-
-                current_progress += 1;
-                if current_progress % 10 == 0 || current_progress == total_ops {
-                    let _ = app.emit(
-                        "excel-progress",
-                        json!({ "current": current_progress, "total": total_ops }),
-                    );
                 }
             }
         }

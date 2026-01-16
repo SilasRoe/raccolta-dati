@@ -1,12 +1,15 @@
 INPUT: You receive the raw text of an order confirmation as INPUT.
 
 TASK: Extract the following relevant information from the text of an order confirmation and return exactly one valid JSON object as the sole output. No explanations, no text fragments, no markdown — just pure JSON.
+IMPORTANT INSTRUCTION ON ATTACHMENTS:
+The PDF document may contain additional pages or attachments (such as technical drawings, delivery notes, emails, or general terms and conditions) that are not part of the main order confirmation.
+Please IGNORE these attachments completely. Extract data ONLY from the main Order/Order Confirmation pages.
 
 EXPECTED JSON SCHEMA (mandatory fields if available, otherwise null/empty array):
 {
   "produkte": [                       // Array: an order can have multiple products/items
     {
-      "produkt": string,      	      // Product name (translate the product names literally into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
+      "produkt": string,      	      // Product name (translate the product names word by word into Italian, i.e., each word separately, not the entire string at once. Example: from “CARDO MARIANO SEMEN” you make “CARDO MARIANO SEMI” and NOT “SEMI DI CARDO MARIANO”)
       "menge": number | null,         // Quantity as a number (no thousand separators, decimal point; can be kg, pz, or similar)
       "waehrung": string | null,      // Currency if available (symbol, e.g. € or $)
       "preis": number | null          // Price per kilogram as a number (without currency symbol)
