@@ -201,7 +201,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       const selected = await open({
         filters: [{ name: "Excel", extensions: ["xlsx", "xlsm"] }],
       });
-      if (typeof selected === "string") excelPathInput.value = selected;
+
+      if (typeof selected === "string") {
+        showToast("Verifico l'accesso al file...", "info");
+        try {
+          await invoke("check_excel_access", { path: selected });
+
+          excelPathInput.value = selected;
+          showToast("File accessibile!", "success");
+        } catch (e) {
+          console.error(e);
+          showToast(`Accesso negato: ${e}. Chiudi il file Excel!`, "error");
+        }
+      }
     });
 
   document

@@ -43,6 +43,23 @@ struct SheetRow {
     date: NaiveDate,
 }
 
+#[command]
+async fn check_excel_access(path: String) -> Result<bool, String> {
+    let path_buf = PathBuf::from(&path);
+
+    if !path_buf.exists() {
+        return Err("Il file non esiste.".to_string());
+    }
+
+    match OpenOptions::new().write(true).open(&path_buf) {
+        Ok(_) => Ok(true),
+        Err(e) => Err(format!(
+            "Accesso negato! Il file è aperto o protetto? ({})",
+            e
+        )),
+    }
+}
+
 fn tokenize(s: &str) -> HashSet<String> {
     s.split_whitespace()
         .map(|w| {
@@ -207,7 +224,6 @@ async fn get_api_key() -> Result<String, String> {
         Err(_) => Ok("".to_string()),
     }
 }
-
 #[command]
 async fn export_to_excel(
     app: tauri::AppHandle,
@@ -242,6 +258,13 @@ async fn export_to_excel(
 
     if let Err(_) = OpenOptions::new().write(true).open(path) {
         return Err("Accesso negato! Il file è aperto.".to_string());
+    }
+
+    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+    let backup_path = path.with_file_name(format!("{}.bak", file_name));
+
+    if let Err(e) = fs::copy(path, &backup_path) {
+        println!("⚠️ Warning: Konnte kein Backup erstellen: {}", e);
     }
 
     let mut book = umya_spreadsheet::reader::xlsx::read(path)
@@ -621,6 +644,12 @@ async fn export_to_excel(
     let _ = umya_spreadsheet::writer::xlsx::write(&book, path)
         .map_err(|e| format!("Errore di memoria: {}", e))?;
 
+    if backup_path.exists() {
+        if let Err(e) = fs::remove_file(&backup_path) {
+            println!("⚠️ Warning: Konnte temporäres Backup nicht löschen: {}", e);
+        }
+    }
+
     let inserted_count = rows_to_insert.len();
     Ok(format!(
         "Finito: {} aggiornati, {} nuovi inseriti.",
@@ -956,7 +985,8 @@ pub fn run() {
             learn_correction,
             get_corrections,
             remove_correction,
-            move_files
+            move_files,
+            check_excel_access
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
