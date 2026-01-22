@@ -60,6 +60,18 @@
         </div>
       </div>
 
+      <div class="form-group" style="margin-top: 15px;">
+        <label for="setting-concurrency" style="display: flex; justify-content: space-between;">
+          <span>Numero di processi paralleli (velocità)</span>
+          <span id="concurrency-value" style="font-weight: bold; color: var(--primary-color);">5</span>
+        </label>
+        <input type="range" id="setting-concurrency" min="1" max="15" step="1" value="5" style="width: 100%;">
+        <small style="color: #888; display: block; margin-top: 4px;">
+          1-2: per account gratuiti (Free Tier).<br>
+          3-15: per account a pagamento (High Performance).
+        </small>
+      </div>
+
       <div class="form-group">
         <label>API Key (Mistral)</label>
         <div class="password-container">

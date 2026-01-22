@@ -4,7 +4,6 @@ import { join } from "@tauri-apps/api/path";
 import Handsontable from "handsontable";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
-import { chunk } from "lodash";
 import { Store } from "@tauri-apps/plugin-store";
 import { listen } from "@tauri-apps/api/event";
 
@@ -224,7 +223,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
   settingsBtn?.addEventListener("click", async () => {
-    const [apiKey, pdfPath, excelPath, processedPath, theme] =
+    const [apiKey, pdfPath, excelPath, processedPath, theme, concurrency] =
       await Promise.all([
         invoke<string>("get_api_key").catch((err) => {
           console.warn(
@@ -237,6 +236,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         store?.get("defaultExcelPath").catch(() => null),
         store?.get("defaultProcessedPdfPath").catch(() => null),
         store?.get("defaultTheme").catch(() => null),
+        store?.get("concurrencyLimit").catch(() => 5),
       ]);
 
     if (apiKeyInput) apiKeyInput.value = apiKey || "";
@@ -245,6 +245,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (processedPathInput)
       processedPathInput.value = (processedPath as string) || "";
     if (theme) themeToggle.checked = theme === "light";
+    const concurrencySlider = document.getElementById(
+      "setting-concurrency"
+    ) as HTMLInputElement;
+    const concurrencyDisplay = document.getElementById("concurrency-value");
+    if (concurrencySlider && concurrencyDisplay) {
+      const val = concurrency ? Number(concurrency) : 5;
+      concurrencySlider.value = String(val);
+      concurrencyDisplay.textContent = String(val);
+      concurrencySlider.oninput = () => {
+        concurrencyDisplay.textContent = concurrencySlider.value;
+      };
+    }
 
     loadAndRenderCorrections();
 
@@ -264,6 +276,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       await store?.set("defaultProcessedPdfPath", processedPathInput.value);
       const newTheme = themeToggle.checked ? "light" : "dark";
       await store?.set("defaultTheme", newTheme);
+      const concurrencySlider = document.getElementById(
+        "setting-concurrency"
+      ) as HTMLInputElement;
+      if (concurrencySlider) {
+        await store?.set(
+          "concurrencyLimit",
+          parseInt(concurrencySlider.value, 10)
+        );
+      }
 
       await store?.save();
 
@@ -464,125 +485,135 @@ async function handleReseachStart() {
   document.body.classList.add("app-loading");
 
   try {
+    const concurrencyLimit =
+      (await store?.get<number>("concurrencyLimit").catch(() => 2)) || 2;
+    console.log(`Starte Analyse mit ${concurrencyLimit} parallelen Workern.`);
+
     const data = hot.getSourceData() as PdfDataRow[];
 
-    const validRows = data.filter((r) => r.fullPath);
-    const totalTasks = validRows.length;
+    const tasks = data
+      .map((row, index) => ({ row, index }))
+      .filter((item) => item.row.fullPath);
+
+    const totalTasks = tasks.length;
     let completedCount = 0;
     setProgress(0, totalTasks);
 
-    const chunkedData = chunk(data, 5);
-    const aiResults: {
-      index: number;
-      row: PdfDataRow;
-      docType: "auftrag" | "rechnung";
-      result: AiResponse;
-    }[] = [];
+    const aiResults: any[] = new Array(data.length).fill(null);
+    let cursor = 0;
 
-    for (const dataChunk of chunkedData) {
-      const chunkResults = await Promise.all(
-        dataChunk.map(async (row, index) => {
-          if (!row.fullPath) return null;
+    const worker = async (workerId: number) => {
+      while (cursor < tasks.length) {
+        if (controller && controller.signal.aborted) return;
 
-          try {
-            const result = await invoke<AiResponse>("analyze_document", {
-              path: row.fullPath,
-              docType: row.docType,
-            });
+        const taskIndex = cursor++;
+        const task = tasks[taskIndex];
 
-            const docType = row.docType;
+        if (!task) break;
 
-            completedCount++;
-            setProgress(completedCount, totalTasks);
-            return { index, row, docType, result };
-          } catch (err) {
-            console.error(err);
-            completedCount++;
-            setProgress(completedCount, totalTasks);
-            hot!.setDataAtRowProp(index, "anmerkungen", String(err));
-            return {
-              index,
-              row,
-              docType: row.docType,
-              result: {} as AiResponse,
-            };
+        try {
+          if (completedCount < concurrencyLimit) {
+            await new Promise((r) => setTimeout(r, workerId * 200));
           }
-        })
-      );
-      aiResults.push(
-        ...chunkResults.filter(
-          (
-            item
-          ): item is {
-            index: number;
-            row: PdfDataRow;
-            docType: "auftrag" | "rechnung";
-            result: AiResponse;
-          } => item !== null
-        )
-      );
-    }
+
+          const result = await invoke<AiResponse>("analyze_document", {
+            path: task.row.fullPath,
+            docType: task.row.docType,
+          });
+
+          aiResults[task.index] = {
+            index: task.index,
+            row: task.row,
+            docType: task.row.docType,
+            result,
+          };
+        } catch (err) {
+          console.error(`Fehler bei Zeile ${task.index}:`, err);
+          hot!.setDataAtRowProp(task.index, "anmerkungen", String(err));
+          aiResults[task.index] = {
+            index: task.index,
+            row: task.row,
+            docType: task.row.docType,
+            result: {} as AiResponse,
+          };
+        } finally {
+          completedCount++;
+          setProgress(completedCount, totalTasks);
+        }
+      }
+    };
+
+    const workers = Array.from({ length: concurrencyLimit }, (_, i) =>
+      worker(i)
+    );
+    await Promise.all(workers);
 
     const newTableData: PdfDataRow[] = [];
 
-    data.forEach((_row, index) => {
-      const aiResult = aiResults[index]?.result;
-      const products = aiResult?.produkte;
-      const docType = aiResults[index]?.docType;
+    data.forEach((originalRow, rowIndex) => {
+      const processedItem = aiResults[rowIndex];
 
-      if (products && Array.isArray(products) && products.length > 0) {
-        products.forEach((prod, prodIndex) => {
-          const newRow: PdfDataRow = { ..._row };
+      if (processedItem && processedItem.result) {
+        const aiResult = processedItem.result;
+        const products = aiResult.produkte;
+        const docType = processedItem.docType;
 
-          if (prodIndex > 0) {
-            newRow.pdfName = "";
-            newRow.fullPath = "";
-            newRow.confirmed = false;
-            newRow.warnings = _row.warnings || false;
-          }
+        if (products && Array.isArray(products) && products.length > 0) {
+          products.forEach((prod: any, prodIndex: number) => {
+            const newRow: PdfDataRow = { ...originalRow };
 
-          newRow.produkt = prod.produkt;
+            if (prodIndex > 0) {
+              newRow.pdfName = "";
+              newRow.fullPath = "";
+              newRow.confirmed = false;
+              newRow.warnings = originalRow.warnings || false;
+            }
 
-          if (docType === "auftrag") {
-            newRow.menge = prod.menge;
-            newRow.waehrung = prod.waehrung;
-            newRow.preis = prod.preis;
-          } else {
-            newRow.gelieferteMenge = prod.gelieferteMenge;
-            newRow.nummerRechnung = aiResult.nummerRechnung;
-            newRow.preis = prod.preis;
-          }
+            newRow.produkt = prod.produkt;
 
-          newTableData.push(newRow);
-        });
-      } else {
-        const errorRow = { ..._row };
-        errorRow.warnings = true;
-        if (!aiResults[index]) {
-          errorRow.anmerkungen = "Errore: impossibile leggere il PDF.";
-        } else if (!aiResult) {
-          errorRow.anmerkungen = "Errore: KI non ha risposto.";
+            if (docType === "auftrag") {
+              newRow.menge = prod.menge;
+              newRow.waehrung = prod.waehrung;
+              newRow.preis = prod.preis;
+            } else {
+              newRow.gelieferteMenge = prod.gelieferteMenge;
+              newRow.nummerRechnung = aiResult.nummerRechnung;
+              newRow.preis = prod.preis;
+            }
+
+            newTableData.push(newRow);
+          });
         } else {
-          errorRow.anmerkungen = "Nessun prodotto riconosciuto.";
+          const errorRow = { ...originalRow };
+          errorRow.warnings = true;
+          if (!errorRow.anmerkungen) {
+            errorRow.anmerkungen = aiResult
+              ? "Nessun prodotto riconosciuto."
+              : "Errore: KI non ha risposto.";
+          }
+          newTableData.push(errorRow);
         }
-        newTableData.push(errorRow);
+      } else {
+        newTableData.push(originalRow);
       }
     });
 
     hot.loadData(newTableData);
     hot.render();
-    hot.updateSettings({
-      allowInsertRow: true,
-    });
+    hot.updateSettings({ allowInsertRow: true });
     requestAnimationFrame(() => {
       hot!.refreshDimensions();
     });
   } catch (error) {
-    console.error("Errore critico nel processo:", error);
+    console.error("Errore critico:", error);
     showToast(`Errore: ${error}`, "error");
   } finally {
     isProcessing = false;
     document.body.classList.remove("app-loading");
+    const startBtn = document.querySelector(
+      "#start-process-btn"
+    ) as HTMLButtonElement;
+    if (startBtn) startBtn.disabled = false;
   }
 }
 
