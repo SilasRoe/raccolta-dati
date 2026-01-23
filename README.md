@@ -33,8 +33,10 @@
 <pre><code>
 .
 ├── src/                # Frontend (TypeScript & Styles)
+│   ├── modules/        # Main logic (event handling, grid control)
 │   ├── prompts/        # AI system prompts for orders and invoices
-│   └── main.ts         # Main logic (event handling, grid control)
+│   ├── types/          # Central type definitions
+│   └── main.ts         # Entry Point
 ├── src-tauri/          # Backend (Rust & Konfiguration)
 │   ├── src/            # Rust Source Code
 │   ├── binaries/       # External utility programs (pdftotext)
