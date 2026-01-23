@@ -1,10 +1,10 @@
-import { AiResponse, PdfDataRow } from "../types";
+import { PdfDataRow } from "../types";
 import { appState } from "./state";
 import { setProgress, showToast } from "./ui";
+import { api } from "./api";
 
 import Handsontable from "handsontable";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "handsontable/styles/handsontable.min.css";
 import "handsontable/styles/ht-theme-main.min.css";
@@ -35,7 +35,7 @@ export function createGrid(container: Element): Handsontable {
         readOnly: true,
         className: "htEllipsis htLink pdf-with-checkbox",
         renderer: pdfNameRenderer,
-        width: 100,
+        width: 75,
       },
       {
         data: "datumAuftrag",
@@ -46,9 +46,9 @@ export function createGrid(container: Element): Handsontable {
         width: 60,
       },
       { data: "nummerAuftrag", width: 50 },
-      { data: "kunde", width: 120 },
-      { data: "lieferant", width: 120 },
-      { data: "produkt", width: 200 },
+      { data: "kunde", width: 75 },
+      { data: "lieferant", width: 75 },
+      { data: "produkt", width: 150 },
       { data: "menge", type: "numeric", width: 40 },
       { data: "waehrung", width: 30 },
       {
@@ -67,7 +67,7 @@ export function createGrid(container: Element): Handsontable {
       },
       { data: "nummerRechnung", width: 50 },
       { data: "gelieferteMenge", type: "numeric", width: 40 },
-      { data: "anmerkungen", type: "text", width: 50 },
+      { data: "anmerkungen", type: "text", width: 100 },
     ],
     copyPaste: true,
     allowInsertRow: false,
@@ -160,10 +160,8 @@ export function createGrid(container: Element): Handsontable {
             typeof oldVal === "string" &&
             typeof newVal === "string"
           ) {
-            invoke("learn_correction", {
-              wrong: oldVal,
-              correct: newVal,
-            })
+            api
+              .learnCorrection(oldVal, newVal)
               .then(() => {
                 console.log(`Imparato: "${oldVal}" -> "${newVal}"`);
               })
@@ -265,10 +263,7 @@ async function reAnalyzeRow(row: number) {
   showToast("Analizza nuovamente il PDF...", "info");
 
   try {
-    const result = await invoke<AiResponse>("analyze_document", {
-      path: rowData.fullPath,
-      docType: rowData.docType,
-    });
+    const result = await api.analyzeDocument(rowData.fullPath, rowData.docType);
 
     const products = result.produkte;
 
@@ -536,10 +531,10 @@ export async function handleExportExcel() {
       }
     );
 
-    const msg = await invoke<string>("export_to_excel", {
-      data: confirmedData,
-      filePath: (await appState.store?.get<string>("defaultExcelPath")) || null,
-    });
+    const msg = await api.exportExcel(
+      confirmedData,
+      (await appState.store?.get<string>("defaultExcelPath")) || null
+    );
 
     if (msg !== "Interruzione da parte dell'utente") {
       showToast(msg, "success");
@@ -549,10 +544,7 @@ export async function handleExportExcel() {
       );
       if (processedDir && pathsToMove.size > 0) {
         try {
-          await invoke("move_files", {
-            paths: Array.from(pathsToMove),
-            targetDir: processedDir,
-          });
+          await api.moveFiles(Array.from(pathsToMove), processedDir);
           showToast(`${pathsToMove.size} PDF spostati.`, "success");
         } catch (moveErr) {
           showToast(`Errore durante lo spostamento: ${moveErr}`, "error");

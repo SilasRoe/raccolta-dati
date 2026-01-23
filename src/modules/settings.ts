@@ -1,14 +1,13 @@
 import { handleSelectFiles, handleSelectFolder } from "./file-manager";
 import { toggleTheme } from "./ui";
-
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "./api";
 
 export async function loadAndRenderCorrections() {
   const listEl = document.getElementById("corrections-list");
   if (!listEl) return;
 
   try {
-    const corrections = await invoke<Record<string, string>>("get_corrections");
+    const corrections = await api.getCorrections();
 
     listEl.innerHTML = "";
 
@@ -45,7 +44,7 @@ export async function loadAndRenderCorrections() {
 
       delBtn.addEventListener("click", async () => {
         try {
-          await invoke("remove_correction", { wrong });
+          await api.removeCorrection(wrong);
           await loadAndRenderCorrections();
         } catch (e) {
           console.error(e);

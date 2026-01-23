@@ -3,6 +3,7 @@ use crate::modules::utils::format_to_uppercase;
 
 use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
+use keepawake;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -156,6 +157,13 @@ pub async fn analyze_document(
     path: String,
     doc_type: String,
 ) -> Result<Value, String> {
+    let _guard = keepawake::Builder::default()
+        .display(false)
+        .idle(true)
+        .sleep(true)
+        .create()
+        .map_err(|e| format!("Impossibile attivare la gestione dell'alimentazione: {}", e))?;
+
     dotenv().ok();
     let api_key = get_api_key().await?;
 

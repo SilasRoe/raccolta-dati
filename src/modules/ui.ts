@@ -1,4 +1,4 @@
-import { handleReseachStart } from "./api";
+import { handleReseachStart, api } from "./api";
 import {
   handleSelectFiles,
   handleSelectFolder,
@@ -10,11 +10,11 @@ import { loadAndRenderCorrections } from "./settings";
 import { createGrid, setupHeaderCheckbox, handleExportExcel } from "./grid";
 
 import { Store } from "@tauri-apps/plugin-store";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
 export async function setupUI() {
+  api.setTaskbarProgress(0, 0).catch(() => {});
   const container = document.querySelector("#data-grid");
   if (!container) return;
 
@@ -189,7 +189,7 @@ export async function setupUI() {
       if (typeof selected === "string") {
         showToast("Verifico l'accesso al file...", "info");
         try {
-          await invoke("check_excel_access", { path: selected });
+          await api.checkExcelAccess(selected);
 
           excelPathInput.value = selected;
           showToast("File accessibile!", "success");
@@ -210,7 +210,7 @@ export async function setupUI() {
   settingsBtn?.addEventListener("click", async () => {
     const [apiKey, pdfPath, excelPath, processedPath, theme, concurrency] =
       await Promise.all([
-        invoke<string>("get_api_key").catch((err) => {
+        api.getApiKey().catch((err) => {
           console.warn(
             "Impossibile caricare la chiave API (forse al primo avvio):",
             err
@@ -254,7 +254,7 @@ export async function setupUI() {
 
   saveSettingsBtn?.addEventListener("click", async () => {
     try {
-      await invoke("save_api_key", { key: apiKeyInput.value });
+      await api.saveApiKey(apiKeyInput.value);
 
       await appState.store?.set("defaultPdfPath", pdfPathInput.value);
       await appState.store?.set("defaultExcelPath", excelPathInput.value);
@@ -380,6 +380,8 @@ export function setProgress(current: number, total: number) {
   const bar = document.getElementById("progress-bar");
   const text = document.getElementById("progress-text");
 
+  api.setTaskbarProgress(current, total).catch(() => {});
+
   if (!container || !bar || !text) return;
 
   if (total <= 0) {
@@ -406,6 +408,7 @@ export function setProgress(current: number, total: number) {
       container.style.display = "none";
       text.style.display = "none";
       bar.style.width = "0%";
+      api.setTaskbarProgress(0, 0).catch(() => {});
     }, 1500);
   }
 }

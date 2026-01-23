@@ -26,6 +26,9 @@ export const api = {
   saveApiKey: (key: string) => invoke("save_api_key", { key }),
 
   getApiKey: () => invoke<string>("get_api_key"),
+
+  setTaskbarProgress: (progress: number, total: number) =>
+    invoke("set_taskbar_progress", { progress, total }),
 };
 
 export async function handleReseachStart() {
@@ -168,6 +171,7 @@ export async function handleReseachStart() {
   } finally {
     appState.isProcessing = false;
     document.body.classList.remove("app-loading");
+    setProgress(0, 0);
     const startBtn = document.querySelector(
       "#start-process-btn"
     ) as HTMLButtonElement;
