@@ -14,7 +14,7 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
 export async function setupUI() {
-  api.setTaskbarProgress(0, 0).catch(() => {});
+  api.setTaskbarProgress(0, 0).catch(() => { });
   const container = document.querySelector("#data-grid");
   if (!container) return;
 
@@ -70,7 +70,7 @@ export async function setupUI() {
     startProcessBtn.addEventListener("click", handleStartProcess);
   }
 
-  function handleStartProcess() {}
+  function handleStartProcess() { }
 
   function updateStartProcessButtonState() {
     const startProcessBtn = document.querySelector(
@@ -401,7 +401,7 @@ export function setupProgressBar() {
 }
 
 export function setProgress(current: number, total: number) {
-  api.setTaskbarProgress(current, total).catch(() => {});
+  api.setTaskbarProgress(current, total).catch(() => { });
 
   const headerText = document.getElementById("header-progress-text");
   const container = document.getElementById("progress-container");
@@ -424,14 +424,18 @@ export function setProgress(current: number, total: number) {
   if (container && bar) {
     container.style.display = "block";
     let percent = (current / total) * 100;
-    if (current > 0 && percent < 1) percent = 1;
+    if (current === 0 && total > 0) {
+      percent = 1;
+    } else if (current > 0) {
+      percent = 1 + (current / total) * 99;
+    }
     bar.style.width = `${percent}%`;
 
     if (current >= total) {
       setTimeout(() => {
         container.style.display = "none";
         if (headerText) headerText.style.display = "none";
-        api.setTaskbarProgress(0, 0).catch(() => {});
+        api.setTaskbarProgress(0, 0).catch(() => { });
       }, 3000);
     }
   }
