@@ -11,6 +11,7 @@ use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportRow {
     datum_auftrag: Option<String>,
     nummer_auftrag: Option<String>,
