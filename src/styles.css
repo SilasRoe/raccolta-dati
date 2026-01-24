@@ -7,8 +7,18 @@
 }
 
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Open Sans",
+    "Helvetica Neue",
+    sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -44,6 +54,13 @@
   --border-color: #222831;
   --scrollbar-thumb: #4f4f4f;
   --scrollbar-thumb-hover: #6f6f6f;
+  --error-color: #883838;
+  --warning-color: #584c24;
+}
+
+[data-theme="light"] {
+  --error-color: #f09c9c;
+  --warning-color: #ffc766;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,6 +94,7 @@ body {
   width: 100%;
   margin: 0;
   padding: 1.5rem;
+  padding-top: 1rem;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -110,9 +128,39 @@ button:disabled {
   align-items: center;
 }
 
-.header-left,
-.header-right {
+.header-left {
   flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: fit-content;
+}
+
+#reload-btn {
+  color: #4caf50;
+}
+#reload-btn:hover {
+  transform: rotate(90deg);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .header-left h1 {
@@ -126,7 +174,6 @@ button:disabled {
 .upload-section {
   margin-top: 2rem;
   margin-bottom: 1rem;
-  display: grid;
   grid-template-columns: max-content;
   gap: 0.5rem;
 }
@@ -146,16 +193,18 @@ button:disabled {
   border-radius: 8px;
   padding: 0.25em 0.5em;
   border: #5f5f5f;
-  font-weight: 500;
-  font-family: inherit !important;
-  color: var(--text-color, #ffffff);
-  background-color: var(--button-bg, #5f5f5f);
   outline: none;
   cursor: pointer;
+  background-color: var(--primary-color);
+  color: var(--text-color);
 }
 
 .file-button:hover {
   background-color: var(--button-hover-bg, #8c8b8b);
+}
+
+#start-process-btn {
+  color: #4caf50;
 }
 
 .btn {
@@ -206,10 +255,10 @@ button:disabled {
 
 .fab-button {
   position: fixed;
-  top: 5rem;
+  top: 4rem;
   right: 1.5rem;
-  width: 56px;
-  height: 56px;
+  width: 45px;
+  height: 45px;
   border-radius: 50%;
   border: none;
   background-color: #4caf50;
@@ -219,7 +268,9 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, background-color 0.2s;
+  transition:
+    transform 0.2s,
+    background-color 0.2s;
   z-index: 1000;
 }
 
@@ -243,7 +294,9 @@ button:disabled {
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
-  transition: background-color 0.2s, transform 0.2s;
+  transition:
+    background-color 0.2s,
+    transform 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,12 +305,6 @@ button:disabled {
 .icon-btn:hover {
   background-color: rgba(128, 128, 128, 0.1);
   transform: rotate(15deg);
-}
-
-#settings-btn {
-  position: fixed;
-  top: 1.2rem;
-  right: 1.5rem;
 }
 
 /* --- Theme Toggle --- */
@@ -358,7 +405,9 @@ button:disabled {
   background: var(--text-color, rgb(205, 21, 21));
   left: var(--underline-left, 0);
   width: var(--underline-width, 0);
-  transition: left 0.3s ease-out, width 0.3s ease-out;
+  transition:
+    left 0.3s ease-out,
+    width 0.3s ease-out;
 }
 
 .sliding-nav button {
@@ -524,14 +573,12 @@ button:disabled {
 .warning-row,
 .handsontable .htCore td.warning-row,
 .handsontable .htCore td.warning-row .wtHolder {
-  background-color: #fff3cd !important;
+  background-color: var(--warning-color) !important;
 }
-
-[data-theme="dark"] .warning-row,
-[data-theme="dark"] .handsontable .htCore td.warning-row,
-[data-theme="dark"] .handsontable .htCore td.warning-row .wtHolder {
-  background-color: #584c24 !important;
-  color: #ffe8b3 !important;
+.error-row,
+.handsontable .htCore td.error-row,
+.handsontable .htCore td.error-row .wtHolder {
+  background-color: var(--error-color) !important;
 }
 
 /* --- Progress Bar --- */
@@ -669,19 +716,26 @@ button:disabled {
   color: var(--text-color);
   padding: 30px;
   border-radius: 12px;
-  width: 420px;
+  width: 33%;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 15px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-title {
-  margin-top: 0;
   margin-bottom: 10px;
   font-size: 1.5rem;
   font-weight: 600;
+  position: sticky;
+  top: -2rem;
+  background: var(--bg-color);
+  z-index: 10;
+  padding-bottom: 10px;
+  margin-top: 0;
 }
 
 .form-group label {
@@ -700,7 +754,9 @@ button:disabled {
   background: var(--bg-secondary);
   color: var(--text-color);
   font-size: 0.95rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
   box-sizing: border-box;
 }
 
@@ -748,7 +804,9 @@ button:disabled {
   padding: 4px;
   color: var(--text-color);
   opacity: 0.5;
-  transition: opacity 0.2s, color 0.2s;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -64,7 +64,7 @@ export async function setupUI() {
   setupProgressBar();
 
   const startProcessBtn = document.querySelector(
-    "#start-process-btn"
+    "#start-process-btn",
   ) as HTMLButtonElement;
   if (startProcessBtn) {
     startProcessBtn.addEventListener("click", handleStartProcess);
@@ -74,7 +74,7 @@ export async function setupUI() {
 
   function updateStartProcessButtonState() {
     const startProcessBtn = document.querySelector(
-      "#start-process-btn"
+      "#start-process-btn",
     ) as HTMLButtonElement;
     if (startProcessBtn) {
       const isTableFilled =
@@ -93,16 +93,16 @@ export async function setupUI() {
   observer.observe(dataGrid, { childList: true, subtree: true });
 
   const selectFilesBtn = document.querySelector(
-    "#select-files-btn"
+    "#select-files-btn",
   ) as HTMLButtonElement;
   const selectFolderBtn = document.querySelector(
-    "#select-folder-btn"
+    "#select-folder-btn",
   ) as HTMLButtonElement;
   const startResearchBtn = document.querySelector(
-    "#start-process-btn"
+    "#start-process-btn",
   ) as HTMLButtonElement;
   const themeToggle = document.querySelector(
-    "#theme-toggle-input"
+    "#theme-toggle-input",
   ) as HTMLInputElement;
 
   if (selectFilesBtn) {
@@ -119,7 +119,7 @@ export async function setupUI() {
       () => {
         handleReseachStart();
       },
-      { signal: signal }
+      { signal: signal },
     );
   }
 
@@ -136,16 +136,16 @@ export async function setupUI() {
   const saveSettingsBtn = document.getElementById("save-settings-btn");
 
   const apiKeyInput = document.getElementById(
-    "setting-api-key"
+    "setting-api-key",
   ) as HTMLInputElement;
   const pdfPathInput = document.getElementById(
-    "setting-pdf-path"
+    "setting-pdf-path",
   ) as HTMLInputElement;
   const excelPathInput = document.getElementById(
-    "setting-excel-path"
+    "setting-excel-path",
   ) as HTMLInputElement;
   const processedPathInput = document.getElementById(
-    "setting-processed-pdf-path"
+    "setting-processed-pdf-path",
   ) as HTMLInputElement;
 
   const toggleApiKeyBtn = document.getElementById("toggle-api-key-btn");
@@ -155,7 +155,7 @@ export async function setupUI() {
       e.preventDefault();
 
       const apiKeyInput = document.getElementById(
-        "setting-api-key"
+        "setting-api-key",
       ) as HTMLInputElement;
       const iconEye = document.getElementById("icon-eye");
       const iconEyeOff = document.getElementById("icon-eye-off");
@@ -208,12 +208,12 @@ export async function setupUI() {
     });
 
   settingsBtn?.addEventListener("click", async () => {
-    const [apiKey, pdfPath, excelPath, processedPath, theme, concurrency] =
+    const [apiKey, pdfPath, excelPath, processedPath, theme] =
       await Promise.all([
         api.getApiKey().catch((err) => {
           console.warn(
             "Impossibile caricare la chiave API (forse al primo avvio):",
-            err
+            err,
           );
           return "";
         }),
@@ -221,8 +221,15 @@ export async function setupUI() {
         appState.store?.get("defaultExcelPath").catch(() => null),
         appState.store?.get("defaultProcessedPdfPath").catch(() => null),
         appState.store?.get("defaultTheme").catch(() => null),
-        appState.store?.get("concurrencyLimit").catch(() => 5),
       ]);
+
+    const storedConcurrency =
+      await appState.store?.get<number>("concurrencyLimit");
+
+    const val =
+      storedConcurrency !== null && storedConcurrency !== undefined
+        ? Number(storedConcurrency)
+        : 5;
 
     if (apiKeyInput) apiKeyInput.value = apiKey || "";
     if (pdfPathInput) pdfPathInput.value = (pdfPath as string) || "";
@@ -231,16 +238,25 @@ export async function setupUI() {
       processedPathInput.value = (processedPath as string) || "";
     if (theme) themeToggle.checked = theme === "light";
     const concurrencySlider = document.getElementById(
-      "setting-concurrency"
+      "setting-concurrency",
     ) as HTMLInputElement;
     const concurrencyDisplay = document.getElementById("concurrency-value");
     if (concurrencySlider && concurrencyDisplay) {
-      const val = concurrency ? Number(concurrency) : 5;
       concurrencySlider.value = String(val);
-      concurrencyDisplay.textContent = String(val);
-      concurrencySlider.oninput = () => {
-        concurrencyDisplay.textContent = concurrencySlider.value;
+
+      const updateLabel = () => {
+        if (concurrencySlider.value === "0") {
+          concurrencyDisplay.textContent = "Frammentato";
+          concurrencyDisplay.style.fontSize = "1em";
+        } else {
+          concurrencyDisplay.textContent = concurrencySlider.value;
+          concurrencyDisplay.style.fontSize = `${1.1 + parseInt(concurrencySlider.value) / 66}em`;
+        }
       };
+
+      updateLabel();
+
+      concurrencySlider.oninput = updateLabel;
     }
 
     loadAndRenderCorrections();
@@ -252,6 +268,13 @@ export async function setupUI() {
     settingsModal!.style.display = "none";
   });
 
+  const reloadBtn = document.getElementById("reload-btn");
+  if (reloadBtn) {
+    reloadBtn.addEventListener("click", () => {
+      window.location.reload();
+    });
+  }
+
   saveSettingsBtn?.addEventListener("click", async () => {
     try {
       await api.saveApiKey(apiKeyInput.value);
@@ -260,17 +283,17 @@ export async function setupUI() {
       await appState.store?.set("defaultExcelPath", excelPathInput.value);
       await appState.store?.set(
         "defaultProcessedPdfPath",
-        processedPathInput.value
+        processedPathInput.value,
       );
       const newTheme = themeToggle.checked ? "light" : "dark";
       await appState.store?.set("defaultTheme", newTheme);
       const concurrencySlider = document.getElementById(
-        "setting-concurrency"
+        "setting-concurrency",
       ) as HTMLInputElement;
       if (concurrencySlider) {
         await appState.store?.set(
           "concurrencyLimit",
-          parseInt(concurrencySlider.value, 10)
+          parseInt(concurrencySlider.value, 10),
         );
       }
 
@@ -279,8 +302,14 @@ export async function setupUI() {
       document.documentElement.setAttribute("data-theme", newTheme);
 
       settingsModal!.style.display = "none";
-      window.location.reload();
-      showToast("Impostazioni salvate", "success");
+      if (reloadBtn) {
+        reloadBtn.style.display = "inline-flex";
+        reloadBtn.style.animation = "pulse 0.5s infinite";
+      }
+      showToast(
+        "Impostazioni salvate. Ricarica la pagina per applicare",
+        "success",
+      );
     } catch (err) {
       console.error("Errore durante il salvataggio:", err);
       showToast(`Errore durante il salvataggio: ${err}`, "error");
@@ -291,7 +320,7 @@ export async function setupUI() {
     if (theme) {
       document.documentElement.setAttribute("data-theme", theme);
       const toggle = document.getElementById(
-        "theme-toggle-input"
+        "theme-toggle-input",
       ) as HTMLInputElement;
       if (toggle) toggle.checked = theme === "light";
     }
@@ -324,7 +353,7 @@ export async function setupUI() {
 
       showToast(
         `${pdfs.length} Ricezione di file tramite drag & drop.`,
-        "success"
+        "success",
       );
     }
   });
@@ -332,7 +361,7 @@ export async function setupUI() {
 
 export function showToast(
   text: string,
-  type: "success" | "error" | "info" = "info"
+  type: "success" | "error" | "info" = "info",
 ) {
   let container = document.getElementById("toast-container");
   if (!container) {
@@ -368,54 +397,49 @@ export function setupProgressBar() {
     bar.id = "progress-bar";
     container.appendChild(bar);
     document.body.appendChild(container);
-
-    const text = document.createElement("div");
-    text.id = "progress-text";
-    document.body.appendChild(text);
   }
 }
 
 export function setProgress(current: number, total: number) {
-  const container = document.getElementById("progress-container");
-  const bar = document.getElementById("progress-bar");
-  const text = document.getElementById("progress-text");
-
   api.setTaskbarProgress(current, total).catch(() => {});
 
-  if (!container || !bar || !text) return;
+  const headerText = document.getElementById("header-progress-text");
+  const container = document.getElementById("progress-container");
+  const bar = document.getElementById("progress-bar");
 
   if (total <= 0) {
-    container.style.display = "none";
-    text.style.display = "none";
+    if (headerText) {
+      headerText.style.display = "none";
+      headerText.textContent = "";
+    }
+    if (container) container.style.display = "none";
     return;
   }
 
-  container.style.display = "block";
-  text.style.display = "block";
-
-  let percent = (current / total) * 100;
-  if (current === 0 && total > 0) {
-    percent = 1;
-  } else if (current > 0) {
-    percent = 1 + (current / total) * 99;
+  if (headerText) {
+    headerText.style.display = "inline-block";
+    headerText.textContent = `${current} / ${total}`;
   }
 
-  bar.style.width = `${percent}%`;
-  text.textContent = `${current} / ${total}`;
+  if (container && bar) {
+    container.style.display = "block";
+    let percent = (current / total) * 100;
+    if (current > 0 && percent < 1) percent = 1;
+    bar.style.width = `${percent}%`;
 
-  if (current >= total) {
-    setTimeout(() => {
-      container.style.display = "none";
-      text.style.display = "none";
-      bar.style.width = "0%";
-      api.setTaskbarProgress(0, 0).catch(() => {});
-    }, 1500);
+    if (current >= total) {
+      setTimeout(() => {
+        container.style.display = "none";
+        if (headerText) headerText.style.display = "none";
+        api.setTaskbarProgress(0, 0).catch(() => {});
+      }, 3000);
+    }
   }
 }
 
 export function toggleTheme(forceTheme?: "light" | "dark") {
   const themeToggle = document.querySelector(
-    "#theme-toggle-input"
+    "#theme-toggle-input",
   ) as HTMLInputElement;
   if (!themeToggle && !forceTheme) return;
 

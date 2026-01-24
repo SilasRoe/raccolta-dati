@@ -3,6 +3,8 @@ import { AiResponse, PdfDataRow } from "../types";
 import { appState } from "./state";
 import { setProgress, showToast } from "./ui";
 
+import { chunk } from "lodash";
+
 export const api = {
   analyzeDocument: (path: string, docType: string) =>
     invoke<AiResponse>("analyze_document", { path, docType }),
@@ -35,16 +37,18 @@ export async function handleReseachStart() {
   if (!appState.hot || appState.isProcessing) return;
 
   const startBtn = document.querySelector(
-    "#start-process-btn"
+    "#start-process-btn",
   ) as HTMLButtonElement;
   appState.isProcessing = true;
   if (startBtn) startBtn.disabled = true;
   document.body.classList.add("app-loading");
 
   try {
+    const storedLimit = await appState.store
+      ?.get<number>("concurrencyLimit")
+      .catch(() => null);
     const concurrencyLimit =
-      (await appState.store?.get<number>("concurrencyLimit").catch(() => 2)) ||
-      5;
+      storedLimit !== null && storedLimit !== undefined ? storedLimit : 5;
 
     const data = appState.hot.getSourceData() as PdfDataRow[];
 
@@ -59,56 +63,99 @@ export async function handleReseachStart() {
     const aiResults: any[] = new Array(data.length).fill(null);
     let cursor = 0;
 
-    const worker = async (workerId: number) => {
-      while (cursor < tasks.length) {
-        if (appState.controller && appState.controller.signal.aborted) return;
+    if (concurrencyLimit === 0) {
+      const taskChunks = chunk(tasks, 3);
 
-        const taskIndex = cursor++;
-        const task = tasks[taskIndex];
+      for (const batch of taskChunks) {
+        if (appState.controller && appState.controller.signal.aborted) break;
 
-        if (!task) break;
+        await Promise.all(
+          batch.map(async (task) => {
+            try {
+              const result = await invoke<AiResponse>("analyze_document", {
+                path: task.row.fullPath,
+                docType: task.row.docType,
+              });
 
-        try {
-          if (completedCount < concurrencyLimit) {
-            await new Promise((r) => setTimeout(r, workerId * 200));
-          }
+              aiResults[task.index] = {
+                index: task.index,
+                row: task.row,
+                docType: task.row.docType,
+                result,
+              };
+            } catch (err) {
+              console.error(`Fehler bei Zeile ${task.index}:`, err);
 
-          const result = await invoke<AiResponse>("analyze_document", {
-            path: task.row.fullPath,
-            docType: task.row.docType,
-          });
+              appState.hot!.setDataAtRowProp(
+                task.index,
+                "anmerkungen",
+                String(err),
+              );
 
-          aiResults[task.index] = {
-            index: task.index,
-            row: task.row,
-            docType: task.row.docType,
-            result,
-          };
-        } catch (err) {
-          console.error(`Fehler bei Zeile ${task.index}:`, err);
-          appState.hot!.setDataAtRowProp(
-            task.index,
-            "anmerkungen",
-            String(err)
-          );
-          aiResults[task.index] = {
-            index: task.index,
-            row: task.row,
-            docType: task.row.docType,
-            result: {} as AiResponse,
-          };
-        } finally {
-          completedCount++;
-          setProgress(completedCount, totalTasks);
-        }
+              aiResults[task.index] = {
+                index: task.index,
+                row: task.row,
+                docType: task.row.docType,
+                result: {} as AiResponse,
+              };
+            } finally {
+              completedCount++;
+              setProgress(completedCount, totalTasks);
+            }
+          }),
+        );
       }
-    };
+    } else {
+      const worker = async (workerId: number) => {
+        while (cursor < tasks.length) {
+          if (appState.controller && appState.controller.signal.aborted) return;
 
-    const workers = Array.from({ length: concurrencyLimit }, (_, i) =>
-      worker(i)
-    );
-    await Promise.all(workers);
+          const taskIndex = cursor++;
+          const task = tasks[taskIndex];
 
+          if (!task) break;
+
+          try {
+            if (completedCount < concurrencyLimit) {
+              await new Promise((r) => setTimeout(r, workerId * 200));
+            }
+
+            const result = await invoke<AiResponse>("analyze_document", {
+              path: task.row.fullPath,
+              docType: task.row.docType,
+            });
+
+            aiResults[task.index] = {
+              index: task.index,
+              row: task.row,
+              docType: task.row.docType,
+              result,
+            };
+          } catch (err) {
+            console.error(`Fehler bei Zeile ${task.index}:`, err);
+            appState.hot!.setDataAtRowProp(
+              task.index,
+              "anmerkungen",
+              String(err),
+            );
+            aiResults[task.index] = {
+              index: task.index,
+              row: task.row,
+              docType: task.row.docType,
+              result: {} as AiResponse,
+            };
+          } finally {
+            completedCount++;
+            setProgress(completedCount, totalTasks);
+          }
+        }
+      };
+
+      const workers = Array.from({ length: concurrencyLimit }, (_, i) =>
+        worker(i),
+      );
+      await Promise.all(workers);
+    }
     const newTableData: PdfDataRow[] = [];
 
     data.forEach((originalRow, rowIndex) => {
@@ -173,7 +220,7 @@ export async function handleReseachStart() {
     document.body.classList.remove("app-loading");
     setProgress(0, 0);
     const startBtn = document.querySelector(
-      "#start-process-btn"
+      "#start-process-btn",
     ) as HTMLButtonElement;
     if (startBtn) startBtn.disabled = false;
   }

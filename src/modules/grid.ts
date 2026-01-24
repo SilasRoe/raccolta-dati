@@ -113,9 +113,7 @@ export function createGrid(container: Element): Handsontable {
         classList.push("htLink", "pdf-with-checkbox");
       }
 
-      const rowData = appState.hot.getSourceDataAtRow(row) as
-        | PdfDataRow
-        | undefined;
+      const rowData = this.instance.getSourceDataAtRow(row) as PdfDataRow;
 
       if (rowData) {
         if (rowData.confirmed) {
@@ -174,9 +172,7 @@ export function createGrid(container: Element): Handsontable {
       if (source === "loadData" || !appState.hot) return;
 
       if (index > 0) {
-        const sourceRow = appState.hot.getSourceDataAtRow(
-          index - 1
-        ) as PdfDataRow;
+        const sourceRow = appState.hot.getSourceDataAtRow(index - 1) as PdfDataRow;
         if (!sourceRow) return;
 
         appState.hot.batch(() => {
@@ -207,9 +203,7 @@ export function createGrid(container: Element): Handsontable {
           if (!target.closest(".pdf-cell-text")) return;
         }
 
-        const rowData = appState.hot.getSourceDataAtRow(
-          coords.row
-        ) as PdfDataRow;
+        const rowData = appState.hot.getSourceDataAtRow(coords.row) as PdfDataRow;
         if (rowData && rowData.fullPath) {
           await openPath(rowData.fullPath);
         }
@@ -240,7 +234,7 @@ function ellipsisRenderer(
   _col: number,
   _prop: string | number,
   value: Handsontable.CellValue,
-  _cellProperties: Handsontable.CellProperties
+  _cellProperties: Handsontable.CellProperties,
 ) {
   Handsontable.renderers.TextRenderer.apply(this, arguments as any);
 
@@ -281,12 +275,12 @@ async function reAnalyzeRow(row: number) {
           appState.hot!.setDataAtRowProp(
             row,
             "gelieferteMenge",
-            firstProd.gelieferteMenge
+            firstProd.gelieferteMenge,
           );
           appState.hot!.setDataAtRowProp(
             row,
             "nummerRechnung",
-            result.nummerRechnung
+            result.nummerRechnung,
           );
           appState.hot!.setDataAtRowProp(row, "preis", firstProd.preis);
         }
@@ -307,19 +301,19 @@ async function reAnalyzeRow(row: number) {
               appState.hot!.setDataAtRowProp(
                 newRowIdx,
                 "waehrung",
-                prod.waehrung
+                prod.waehrung,
               );
               appState.hot!.setDataAtRowProp(newRowIdx, "preis", prod.preis);
             } else {
               appState.hot!.setDataAtRowProp(
                 newRowIdx,
                 "gelieferteMenge",
-                prod.gelieferteMenge
+                prod.gelieferteMenge,
               );
               appState.hot!.setDataAtRowProp(
                 newRowIdx,
                 "nummerRechnung",
-                result.nummerRechnung
+                result.nummerRechnung,
               );
               appState.hot!.setDataAtRowProp(newRowIdx, "preis", prod.preis);
             }
@@ -332,7 +326,7 @@ async function reAnalyzeRow(row: number) {
       appState.hot.setDataAtRowProp(
         row,
         "anmerkungen",
-        "Nessun prodotto rilevato."
+        "Nessun prodotto rilevato.",
       );
       showToast("Nessun prodotto riconosciuto.", "info");
     }
@@ -415,7 +409,7 @@ export function setupHeaderCheckbox() {
 function updateHeaderCheckboxState() {
   if (!appState.hot) return;
   const cbs = Array.from(
-    document.querySelectorAll(".header-confirmed")
+    document.querySelectorAll(".header-confirmed"),
   ) as HTMLInputElement[];
   if (!cbs || cbs.length === 0) return;
 
@@ -430,7 +424,7 @@ function updateHeaderCheckboxState() {
 
   const confirmedCount = data.reduce(
     (acc, r) => acc + (r.confirmed ? 1 : 0),
-    0
+    0,
   );
   if (confirmedCount === 0) {
     cbs.forEach((cb) => {
@@ -458,7 +452,7 @@ function pdfNameRenderer(
   _col: number,
   _prop: string | number,
   value: Handsontable.CellValue,
-  _cellProperties: Handsontable.CellProperties
+  _cellProperties: Handsontable.CellProperties,
 ) {
   Handsontable.renderers.TextRenderer.apply(this, arguments as any);
 
@@ -528,19 +522,19 @@ export async function handleExportExcel() {
       "excel-progress",
       (event) => {
         setProgress(event.payload.current, event.payload.total);
-      }
+      },
     );
 
     const msg = await api.exportExcel(
       confirmedData,
-      (await appState.store?.get<string>("defaultExcelPath")) || null
+      (await appState.store?.get<string>("defaultExcelPath")) || null,
     );
 
     if (msg !== "Interruzione da parte dell'utente") {
       showToast(msg, "success");
 
       const processedDir = await appState.store?.get<string>(
-        "defaultProcessedPdfPath"
+        "defaultProcessedPdfPath",
       );
       if (processedDir && pathsToMove.size > 0) {
         try {
