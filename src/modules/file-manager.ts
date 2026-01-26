@@ -70,70 +70,44 @@ export async function loadPdfsFromDirectory(path: string) {
 }
 
 export function updateFileUI() {
-  if (!appState.hot) return;
+  if (!appState.hot) return
 
-  const currentData = appState.hot.getSourceData() as PdfDataRow[];
+  let nextId = 1
 
-  const existingPaths = new Set(
-    currentData.map((row) => row.fullPath).filter(Boolean)
-  );
-
-  let nextId =
-    currentData.length > 0
-      ? Math.max(...currentData.map((r) => r.id || 0)) + 1
-      : 1;
-
-  const newPaths = appState.selectedPdfPaths.filter(
-    (path) => !existingPaths.has(path)
-  );
-
-  const duplicatesCount = appState.selectedPdfPaths.length - newPaths.length;
-
-  if (duplicatesCount > 0) {
-    showToast(
-      `${duplicatesCount} File ignorati (già presenti nell'elenco).`,
-      "info"
-    );
-  }
-
-  if (newPaths.length === 0) {
-    return;
-  }
-
-  const newRows = newPaths
+  const newRows = appState.selectedPdfPaths
     .map((path): PdfDataRow | null => {
       try {
         const lastSeparatorIndex = Math.max(
           path.lastIndexOf("/"),
           path.lastIndexOf("\\")
-        );
+        )
         const fileName = path
           .substring(lastSeparatorIndex + 1)
           .replace(/\.pdf$/i, "")
-          .toUpperCase();
+          .toUpperCase()
 
-        const isInvoice = fileName.startsWith("FT");
-        const docType = isInvoice ? "rechnung" : "auftrag";
+        const isInvoice = fileName.startsWith("FT")
+        const docType = isInvoice ? "rechnung" : "auftrag"
 
-        let datumRechnung, datumAuftrag, nummerAuftrag, kunde, lieferant;
+        let datumRechnung, datumAuftrag, nummerAuftrag, kunde, lieferant
 
-        const parts = fileName.split("_");
+        const parts = fileName.split("_")
 
         if (isInvoice) {
-          datumRechnung = parseDateStrings(parts[2]?.split("-")[0]);
-          nummerAuftrag = parts[3] || null;
-          kunde = parts[2]?.split("-")[1] || null;
-          lieferant = parts[1] || null;
+          datumRechnung = parseDateStrings(parts[2]?.split("-")[0])
+          nummerAuftrag = parts[3] || null
+          kunde = parts[2]?.split("-")[1] || null
+          lieferant = parts[1] || null
         } else {
-          datumAuftrag = parseDateStrings(parts[1]);
-          nummerAuftrag = parts[0] || null;
-          kunde = parts[2]?.split("-")[1] || null;
-          lieferant = parts[2]?.split("-")[0] || null;
+          datumAuftrag = parseDateStrings(parts[1])
+          nummerAuftrag = parts[0] || null
+          kunde = parts[2]?.split("-")[1] || null
+          lieferant = parts[2]?.split("-")[0] || null
         }
 
         const missingData = isInvoice
           ? !datumRechnung || !nummerAuftrag || !kunde || !lieferant
-          : !datumAuftrag || !nummerAuftrag || !kunde || !lieferant;
+          : !datumAuftrag || !nummerAuftrag || !kunde || !lieferant
 
         return {
           id: nextId++,
@@ -147,37 +121,35 @@ export function updateFileUI() {
           datumAuftrag: datumAuftrag || null,
           nummerAuftrag,
           datumRechnung: datumRechnung || null,
-        } as PdfDataRow;
+        } as PdfDataRow
       } catch (e) {
-        console.error(`Errore durante l'analisi di ${path}:`, e);
-        return null;
+        console.error(`Errore durante l'analisi di ${path}:`, e)
+        return null
       }
     })
-    .filter((row): row is PdfDataRow => row !== null);
+    .filter((row): row is PdfDataRow => row !== null)
 
-  const allData = [...currentData, ...newRows];
-
-  allData.sort((a, b) => {
-    const compLieferant = (a.lieferant || "").localeCompare(b.lieferant || "");
-    if (compLieferant !== 0) return compLieferant;
+  newRows.sort((a, b) => {
+    const compLieferant = (a.lieferant || "").localeCompare(b.lieferant || "")
+    if (compLieferant !== 0) return compLieferant
 
     const compOrder = (a.nummerAuftrag || "").localeCompare(
       b.nummerAuftrag || "",
       undefined,
       { numeric: true }
-    );
-    if (compOrder !== 0) return compOrder;
+    )
+    if (compOrder !== 0) return compOrder
 
     const dateA = a.datumAuftrag
       ? a.datumAuftrag.split("/").reverse().join("-")
-      : "";
+      : ""
     const dateB = b.datumAuftrag
       ? b.datumAuftrag.split("/").reverse().join("-")
-      : "";
-    return dateA.localeCompare(dateB);
-  });
+      : ""
+    return dateA.localeCompare(dateB)
+  })
 
-  appState.hot.loadData(allData);
+  appState.hot.loadData(newRows)
 }
 
 function parseDateStrings(dateString: string) {
