@@ -261,27 +261,21 @@ async function reAnalyzeRow(row: number) {
 
     const products = result.produkte;
 
+    const toUpper = (str: any) => (str && typeof str === 'string') ? str.toUpperCase() : str;
+
     if (products && Array.isArray(products) && products.length > 0) {
       appState.hot.batch(() => {
         const firstProd = products[0];
 
-        appState.hot!.setDataAtRowProp(row, "produkt", firstProd.produkt);
+        appState.hot!.setDataAtRowProp(row, "produkt", toUpper(firstProd.produkt));
 
         if (rowData.docType === "auftrag") {
-          appState.hot!.setDataAtRowProp(row, "menge", firstProd.menge);
-          appState.hot!.setDataAtRowProp(row, "waehrung", firstProd.waehrung);
+          appState.hot!.setDataAtRowProp(row, "menge", toUpper(firstProd.menge));
+          appState.hot!.setDataAtRowProp(row, "waehrung", toUpper(firstProd.waehrung));
           appState.hot!.setDataAtRowProp(row, "preis", firstProd.preis);
         } else {
-          appState.hot!.setDataAtRowProp(
-            row,
-            "gelieferteMenge",
-            firstProd.gelieferteMenge,
-          );
-          appState.hot!.setDataAtRowProp(
-            row,
-            "nummerRechnung",
-            result.nummerRechnung,
-          );
+          appState.hot!.setDataAtRowProp(row, "gelieferteMenge", firstProd.gelieferteMenge);
+          appState.hot!.setDataAtRowProp(row, "nummerRechnung", toUpper(result.nummerRechnung));
           appState.hot!.setDataAtRowProp(row, "preis", firstProd.preis);
         }
 
@@ -394,6 +388,20 @@ export function setupHeaderCheckbox() {
         const data = appState.hot!.getSourceData() as PdfDataRow[];
         data.forEach((_row, index) => {
           appState.hot!.setDataAtRowProp(index, "confirmed", checked);
+
+          if (checked) {
+            const currentNote = appState.hot!.getDataAtRowProp(index, "anmerkungen");
+            if (!currentNote || currentNote.trim() === "") {
+              const rData = appState.hot!.getSourceDataAtRow(index) as PdfDataRow;
+              const symbol = rData.docType === "auftrag" ? "O" : "F";
+              appState.hot!.setDataAtRowProp(index, "anmerkungen", symbol);
+            }
+          } else {
+            const currentNote = appState.hot!.getDataAtRowProp(index, "anmerkungen");
+            if (currentNote === "F" || currentNote === "O") {
+              appState.hot!.setDataAtRowProp(index, "anmerkungen", "");
+            }
+          }
         });
       });
       updateHeaderCheckboxState();
@@ -483,6 +491,20 @@ function pdfNameRenderer(
     const checked = checkbox.checked;
     if (appState.hot) {
       appState.hot.setDataAtRowProp(row, "confirmed", checked);
+
+      if (checked) {
+        const currentNote = appState.hot.getDataAtRowProp(row, "anmerkungen");
+        if (!currentNote || currentNote.trim() === "") {
+          const rData = appState.hot.getSourceDataAtRow(row) as PdfDataRow;
+          const symbol = rData.docType === "auftrag" ? "O" : "F";
+          appState.hot.setDataAtRowProp(row, "anmerkungen", symbol);
+        }
+      } else {
+        const currentNote = appState.hot.getDataAtRowProp(row, "anmerkungen");
+        if (currentNote === "F" || currentNote === "O") {
+          appState.hot.setDataAtRowProp(row, "anmerkungen", "");
+        }
+      }
     }
   });
 
