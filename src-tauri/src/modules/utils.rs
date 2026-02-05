@@ -43,7 +43,7 @@ pub fn parse_date(date_str: &str) -> Option<NaiveDate> {
     }
 
     if let Ok(days) = date_str.parse::<i64>() {
-        let base = NaiveDate::from_ymd_opt(1899, 12, 30)?;
+        let base = NaiveDate::from_ymd_opt(1904, 1, 1)?;
         return base.checked_add_signed(chrono::Duration::days(days));
     }
     None

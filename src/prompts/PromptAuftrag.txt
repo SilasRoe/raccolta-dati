@@ -1,9 +1,6 @@
 INPUT: You receive the raw text of an order confirmation as INPUT.
 
 TASK: Extract the following relevant information from the text of an order confirmation and return exactly one valid JSON object as the sole output. No explanations, no text fragments, no markdown — just pure JSON.
-IMPORTANT INSTRUCTION ON ATTACHMENTS:
-The PDF document may contain additional pages or attachments (such as technical drawings, delivery notes, emails, or general terms and conditions) that are not part of the main order confirmation.
-Please IGNORE these attachments completely. Extract data ONLY from the main Order/Order Confirmation pages.
 
 EXPECTED JSON SCHEMA (mandatory fields if available, otherwise null/empty array):
 {
@@ -19,11 +16,11 @@ EXPECTED JSON SCHEMA (mandatory fields if available, otherwise null/empty array)
 
 FORMAT AND NORMALIZATION RULES:
 1. Language: All data must be translated into Italian. This applies in particular to product names.
-2. NUMBER FORMAT (IMPORTANT): Numbers in raw text often contain spaces (e.g., “1 0 0 , 00” or “2 , 5 5”). You MUST remove these spaces before interpreting the number (“2 , 5 5” -> 2.55).
-3. NUMBERS: Output as JSON numbers (e.g., 1234.56). The decimal separator is a period.
+2. NUMBER FORMAT (IMPORTANT): Numbers in raw text can contain spaces (e.g., “1 0 0 , 00” or “2 , 5 5”). You MUST remove these spaces before interpreting the number (“2 , 5 5” -> 2,55).
+3. NUMBERS: Output as JSON numbers (e.g. 1234,56). The decimal separator is a comma.
 4. ATTENTION LAYOUT OFFSET: Due to formatting errors, prices and quantities are sometimes NOT exactly on the same line as the product name. They may have slipped down a line (offset). Rule: If a product line has no prices, immediately look at the line directly below it. If there are “orphaned” numbers without text there, they belong to the product above.
 5. PRODUCT NAMES: Clean up unnecessary whitespace, keep special characters.
-6. PRODUCTS: If no product items are found, return “products”: [].
+6. PRODUCTS: If no product items are found, return "products": [].
 7. FIELDS: Fields that are not found must be output as zero.
 7.1 PRODUCTS: If no product is found for a field, ignore that field. There must be NO entries in the JSON without a product!
 8. OUTPUT: Must not contain any additional fields other than the schema specified above.
@@ -32,7 +29,7 @@ EXAMPLE OUTPUT:
 {
   "produkte":[
     {
-      "produkt":“Product A”,
+      "produkt":"Product A",
       "menge":1000,
       "waehrung":“EUR”,
       "preis":1.25

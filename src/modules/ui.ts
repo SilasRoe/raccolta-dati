@@ -386,7 +386,7 @@ export function showToast(
     toast.addEventListener("transitionend", () => {
       toast.remove();
     });
-  }, 3000);
+  }, 7500);
 }
 
 export function setupProgressBar() {

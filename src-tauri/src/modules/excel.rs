@@ -5,10 +5,12 @@ use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::fs::OpenOptions;
+use std::io::Read;
 use std::path::PathBuf;
 use tauri::command;
 use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
+use zip::ZipArchive;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +50,21 @@ pub async fn check_excel_access(path: String) -> Result<bool, String> {
             e
         )),
     }
+}
+
+fn is_1904_system(path: &std::path::Path) -> bool {
+    if let Ok(file) = std::fs::File::open(path) {
+        if let Ok(mut archive) = ZipArchive::new(file) {
+            if let Ok(mut xml_file) = archive.by_name("xl/workbook.xml") {
+                let mut contents = String::new();
+                if xml_file.read_to_string(&mut contents).is_ok() {
+                    return contents.contains("date1904=\"1\"")
+                        || contents.contains("date1904=\"true\"");
+                }
+            }
+        }
+    }
+    false
 }
 
 #[command]
@@ -90,7 +107,12 @@ pub async fn export_to_excel(
     let backup_path = path.with_file_name(format!("{}.bak", file_name));
 
     if let Err(e) = fs::copy(path, &backup_path) {
-        println!("⚠️ Warning: Konnte kein Backup erstellen: {}", e);
+        println!("Avviso: impossibile creare il backup: {}", e);
+    }
+
+    let is_1904 = is_1904_system(path);
+    if is_1904 {
+        println!("INFO: Datei verwendet 1904-Datumssystem. Daten werden migriert.");
     }
 
     let mut book = umya_spreadsheet::reader::xlsx::read(path)
@@ -112,6 +134,20 @@ pub async fn export_to_excel(
         }
     }
     let start_data_row = header_row + 1;
+
+    if is_1904 && highest_row >= start_data_row {
+        for r in start_data_row..=highest_row {
+            for col in [1, 10, 17] {
+                let cell = sheet.get_cell_mut((col, r));
+                let val_str = cell.get_value().to_string();
+                if let Ok(val_num) = val_str.parse::<f64>() {
+                    if val_num > 30000.0 {
+                        cell.set_value_number(val_num + 1462.0);
+                    }
+                }
+            }
+        }
+    }
 
     struct ExcelCandidate {
         row_idx: u32,

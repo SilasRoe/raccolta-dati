@@ -36,3 +36,4 @@ regex = "1"
 tauri-plugin-store = "2.4.1"
 keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 keepawake = "0.6.0"
+zip = "7.3.0"
