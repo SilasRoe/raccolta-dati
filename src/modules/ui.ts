@@ -304,7 +304,7 @@ export async function setupUI() {
       settingsModal!.style.display = "none";
       if (reloadBtn) {
         reloadBtn.style.display = "inline-flex";
-        reloadBtn.style.animation = "pulse 0.5s infinite";
+        reloadBtn.style.animation = "pulse-green 0.5s infinite";
       }
       showToast(
         "Impostazioni salvate. Ricarica la pagina per applicare",

@@ -141,26 +141,17 @@ button:disabled {
 }
 
 #reload-btn {
-  color: #4caf50;
+  display: inline-flex;
 }
 #reload-btn:hover {
   transform: rotate(90deg);
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.25);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+@keyframes pulse-green {
+  0% { transform: scale(1); color: var(--text-primary); }
+  50% { transform: scale(1.25); color: #22c55e; }
+  100% { transform: scale(1); color: var(--text-primary); }
 }
 
 .header-left h1 {
