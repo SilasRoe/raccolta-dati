@@ -449,18 +449,32 @@ pub async fn export_to_excel(
                 (start_row + count, start_row + count)
             };
 
-            let template_formula = match sheet.get_cell((13, template_row)) {
-                Some(c) => c.get_formula().to_string(),
-                None => String::new(),
-            };
-
             let mut column_styles = Vec::with_capacity(18);
             for col in 1..=18 {
                 column_styles.push(sheet.get_style((col, template_row)).clone());
             }
 
+            let (template_height, template_custom_height) =
+                match sheet.get_row_dimension(&template_row) {
+                    Some(row_dim) => (*row_dim.get_height(), *row_dim.get_custom_height()),
+                    None => (0.0, false),
+                };
+
+            let template_formula = match sheet.get_cell((13, template_row)) {
+                Some(c) => c.get_formula().to_string(),
+                None => String::new(),
+            };
+
             for (i, row_data) in batch.iter().enumerate() {
                 let r = start_row + i as u32;
+
+                if template_height > 0.0 {
+                    let row_dim = sheet.get_row_dimension_mut(&r);
+                    row_dim.set_height(template_height);
+                    if template_custom_height {
+                        row_dim.set_custom_height(true);
+                    }
+                }
 
                 if let Some(v) = &row_data.datum_auftrag {
                     sheet.get_cell_mut((1, r)).set_value(v);
@@ -501,15 +515,7 @@ pub async fn export_to_excel(
 
                 for col in 1..=18 {
                     if let Some(style) = column_styles.get((col - 1) as usize) {
-                        let mut s = style.clone();
-                        let alignment = s.get_alignment_mut();
-                        alignment.set_wrap_text(false);
-
-                        if col == 1 || col == 10 {
-                            alignment
-                                .set_horizontal(umya_spreadsheet::HorizontalAlignmentValues::Right);
-                        }
-                        sheet.set_style((col, r), s);
+                        sheet.set_style((col, r), style.clone());
                     }
                 }
 
