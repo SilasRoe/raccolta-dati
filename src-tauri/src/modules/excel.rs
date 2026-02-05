@@ -243,8 +243,32 @@ pub async fn export_to_excel(
                 }
             }
         }
-
         if let Some(row_idx) = best_match_excel {
+            if let Some(v) = &row.datum_auftrag {
+                sheet.get_cell_mut((1, row_idx)).set_value(v);
+            }
+            if let Some(v) = &row.nummer_auftrag {
+                sheet.get_cell_mut((2, row_idx)).set_value(v);
+            }
+            if let Some(v) = &row.kunde {
+                sheet.get_cell_mut((3, row_idx)).set_value(v);
+            }
+            if let Some(v) = &row.lieferant {
+                sheet.get_cell_mut((4, row_idx)).set_value(v);
+            }
+            if let Some(v) = &row.produkt {
+                sheet.get_cell_mut((5, row_idx)).set_value(v);
+            }
+            if let Some(v) = row.menge {
+                sheet.get_cell_mut((6, row_idx)).set_value_number(v);
+            }
+            if let Some(v) = &row.waehrung {
+                sheet.get_cell_mut((7, row_idx)).set_value(v);
+            }
+            if let Some(v) = row.preis {
+                sheet.get_cell_mut((8, row_idx)).set_value_number(v);
+            }
+
             if let Some(v) = &row.datum_rechnung {
                 sheet.get_cell_mut((10, row_idx)).set_value(v);
             }
@@ -254,12 +278,11 @@ pub async fn export_to_excel(
             if let Some(v) = row.gelieferte_menge {
                 sheet.get_cell_mut((12, row_idx)).set_value_number(v);
             }
+
             if let Some(v) = &row.anmerkungen {
-                let existing_note = sheet.get_value((18, row_idx));
-                if existing_note.is_empty() {
-                    sheet.get_cell_mut((18, row_idx)).set_value(v);
-                }
+                sheet.get_cell_mut((18, row_idx)).set_value(v);
             }
+
             updated_count += 1;
         } else {
             let mut found_in_pending = false;
