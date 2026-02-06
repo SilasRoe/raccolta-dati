@@ -5,7 +5,7 @@ import { relaunch } from '@tauri-apps/plugin-process';
 document.addEventListener("DOMContentLoaded", async () => {
   setupUI();
 
-  checkForAppUpdates();
+  await checkForAppUpdates();
 });
 
 async function checkForAppUpdates() {

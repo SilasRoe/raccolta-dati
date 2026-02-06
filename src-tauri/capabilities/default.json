@@ -60,6 +60,7 @@
       "allow": [{ "path": "$HOME/**" }]
     },
     "store:default",
-    "store:allow-load"
+    "store:allow-load",
+    "updater:default"
   ]
 }
