@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Raccolta Dati",
-  "version": "0.1.0",
+  "version": "1.1.1",
   "identifier": "com.silas.raccolta-dati",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -30,7 +30,8 @@
     ],
     "externalBin": [
       "binaries/pdftotext"
-    ]
+    ],
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "updater": {
@@ -38,7 +39,7 @@
         "https://github.com/silasroe/raccolta-dati/releases/latest/download/latest.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEQkMwRkY2QjY0MDUxNEQKUldSTlVVQzI5Zys4TFphS05GQWdsamV1SSsrT0ozU2N0b3ZrelBvTjRmQVhCWW5GYmNJOGdHc3UK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzRTZBOEQ4MEQyMEM4Q0QKUldUTnlDQU4yS2ptazd3SFdqNzlGWm5zUXpJOVRJNVhEaWxEc0ZvSWpUS3d2d1JkNXgxVzNiLzUK"
     }
   }
 }

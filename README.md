@@ -8,16 +8,17 @@
 <h1>Raccolta Dati</h1>
 
 <p>
-    <strong>Raccolta Dati</strong> is a desktop application based on <strong>Tauri</strong> and <strong>Vanilla TypeScript</strong> that specializes in extracting data from PDF documents (order confirmations and invoices) using AI and processing it in a tabular overview.
+    <strong>Raccolta Dati</strong> is a desktop application based on <strong>Tauri</strong> and <strong>Vanilla TypeScript</strong> that specializes in extracting data from PDF documents (order confirmations and invoices) using AI and synchronizing it with Excel spreadsheets.
 </p>
 
 <h2>Main Functions</h2>
 <ul>
-    <li><strong>AI-powered PDF analysis:</strong> Automatic extraction of products, quantities, prices, and currencies from PDF files using <em>Mistral AI</em>.</li>
-    <li><strong>Data-Grid (Handsontable):</strong> An interactive, Excel-like interface for editing and validating the extracted data.</li>
+    <li><strong>Hybrid AI & OCR Engine:</strong> Combines local text extraction via <em>pdftotext</em> with <em>Mistral OCR</em> and <em>Mistral Large</em> to handle complex layouts and even image-based PDFs reliably.</li>
+    <li><strong>Smart Excel Synchronization:</strong> Intelligent export that doesn't just append data but updates existing order rows with invoice details (matching by fuzzy logic on prices/quantities). It preserves cell formatting, formulas, and sorts entries automatically (Supplier &gt; Order Nr &gt; Date).</li>
+    <li><strong>Data-Grid (Handsontable):</strong> An interactive, Excel-like interface for editing and validating the extracted data before export.</li>
     <li><strong>Intelligent translation:</strong> Automatic translation of product names into Italian directly during the extraction process.</li>
-    <li><strong>Excel-Export:</strong> Export validated and confirmed data to existing Excel spreadsheets.</li>
-    <li><strong>Correction learning mode:</strong> The application learns from manual corrections of product names for future analyses.</li>
+    <li><strong>Correction learning mode:</strong> The application learns from manual corrections of product names to improve future analyses automatically.</li>
+    <li><strong>Auto-Updater:</strong> Integrated update mechanism to keep the application up-to-date via GitHub Releases.</li>
 </ul>
 
 <h2>Technology Stack</h2>
@@ -25,22 +26,23 @@
     <li><strong>Frontend:</strong> TypeScript, Vite, HTML5, CSS3.</li>
     <li><strong>UI components:</strong> Handsontable (Spreadsheet-Grid).</li>
     <li><strong>Backend:</strong> Rust (Tauri Framework).</li>
-    <li><strong>AI integration:</strong> Mistral AI API.</li>
-    <li><strong>PDF processing:</strong> PDF.js and an external <code>pdftotext</code> binary.</li>
+    <li><strong>AI integration:</strong> Mistral AI API (Large & OCR models).</li>
+    <li><strong>PDF processing:</strong> Hybrid approach using <code>pdftotext</code> binary (Sidecar) and Cloud OCR.</li>
+    <li><strong>Excel Engine:</strong> <code>umya_spreadsheet</code> for reading/writing .xlsx files with style preservation.</li>
 </ul>
 
 <h2>Project Structure</h2>
 <pre><code>
 .
 ├── src/                # Frontend (TypeScript & Styles)
-│   ├── modules/        # Main logic (event handling, grid control)
+│   ├── modules/        # Main logic (event handling, grid control, API)
 │   ├── prompts/        # AI system prompts for orders and invoices
 │   ├── types/          # Central type definitions
-│   └── main.ts         # Entry Point
-├── src-tauri/          # Backend (Rust & Konfiguration)
-│   ├── src/            # Rust Source Code
+│   └── main.ts         # Entry Point & Updater Logic
+├── src-tauri/          # Backend (Rust & Configuration)
+│   ├── src/            # Rust Source Code (Modules: AI, Excel, Config)
 │   ├── binaries/       # External utility programs (pdftotext)
-│   └── tauri.conf.json # App configuration & security policies
+│   └── tauri.conf.json # App configuration, permissions & plugins
 ├── package.json        # Dependencies & Scripts
 └── tsconfig.json       # TypeScript configuration
 </code></pre>
