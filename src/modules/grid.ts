@@ -558,12 +558,30 @@ export async function handleExportExcel() {
       const processedDir = await appState.store?.get<string>(
         "defaultProcessedPdfPath",
       );
+      const shouldMove = (await appState.store?.get<boolean>("moveFilesEnabled")) !== false;
       if (processedDir && pathsToMove.size > 0) {
         try {
-          await api.moveFiles(Array.from(pathsToMove), processedDir);
-          showToast(`${pathsToMove.size} PDF spostati.`, "success");
+          if (shouldMove) {
+            await api.moveFiles(Array.from(pathsToMove), processedDir);
+            showToast(`${pathsToMove.size} PDF spostati.`, "success");
+          } else {
+            await api.copyFiles(Array.from(pathsToMove), processedDir);
+            showToast(`${pathsToMove.size} PDF copiati.`, "success");
+          }
         } catch (moveErr) {
           showToast(`Errore durante lo spostamento: ${moveErr}`, "error");
+        }
+      }
+    }
+
+    const shouldOpen = await appState.store?.get<boolean>("autoOpenExcel");
+    if (shouldOpen) {
+      const excelPath = await appState.store?.get<string>("defaultExcelPath");
+      if (excelPath) {
+        try {
+          await openPath(excelPath);
+        } catch (e) {
+          console.error("Impossibile aprire Excel:", e);
         }
       }
     }

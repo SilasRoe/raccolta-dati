@@ -2,6 +2,59 @@ use chrono::NaiveDate;
 use regex::Regex;
 use serde_json::{json, Value};
 use std::collections::HashSet;
+use tauri::command;
+
+#[command]
+pub async fn copy_files(file_paths: Vec<String>, target_dir: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let target_path = Path::new(&target_dir);
+    if !target_path.exists() {
+        return Err("La cartella di destinazione non esiste.".to_string());
+    }
+
+    for path_str in file_paths {
+        let source_path = Path::new(&path_str);
+        if let Some(file_name) = source_path.file_name() {
+            let dest_path = target_path.join(file_name);
+            fs::copy(source_path, dest_path)
+                .map_err(|e| format!("Errore durante la copia di {:?}: {}", source_path, e))?;
+        }
+    }
+    Ok(())
+}
+
+pub fn close_excel_if_open(path: &str) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+
+        let path_str = path.replace("/", "\\").replace("'", "''");
+
+        let script = format!(
+            "$target = [System.IO.Path]::GetFullPath('{}'); \
+            try {{ \
+                $excel = [Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application'); \
+                if ($excel -ne $null) {{ \
+                    foreach ($wb in $excel.Workbooks) {{ \
+                        if ([System.IO.Path]::GetFullPath($wb.FullName) -eq $target) {{ \
+                            $wb.Save(); \
+                            $wb.Close(); \
+                            break; \
+                        }} \
+                    }} \
+                }} \
+            }} catch {{}}",
+            path_str
+        );
+
+        let _ = std::process::Command::new("powershell")
+            .args(&["-NoProfile", "-Command", &script])
+            .creation_flags(0x08000000)
+            .output();
+    }
+}
 
 fn tokenize(s: &str) -> HashSet<String> {
     s.split_whitespace()

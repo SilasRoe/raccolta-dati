@@ -147,6 +147,8 @@ export async function setupUI() {
   const processedPathInput = document.getElementById(
     "setting-processed-pdf-path",
   ) as HTMLInputElement;
+  const moveToggle = document.getElementById("setting-file-action") as HTMLInputElement;
+  const openToggle = document.getElementById("setting-auto-open") as HTMLInputElement;
 
   const toggleApiKeyBtn = document.getElementById("toggle-api-key-btn");
 
@@ -223,6 +225,11 @@ export async function setupUI() {
         appState.store?.get("defaultTheme").catch(() => null),
       ]);
 
+    const shouldMove = await appState.store?.get<boolean>("moveFilesEnabled");
+    const autoOpen = await appState.store?.get<boolean>("autoOpenExcel");
+    const isMove = shouldMove !== false;
+    const isAutoOpen = autoOpen === true;
+
     const storedConcurrency =
       await appState.store?.get<number>("concurrencyLimit");
 
@@ -237,6 +244,8 @@ export async function setupUI() {
     if (processedPathInput)
       processedPathInput.value = (processedPath as string) || "";
     if (theme) themeToggle.checked = theme === "light";
+    if (moveToggle) moveToggle.checked = isMove;
+    if (openToggle) openToggle.checked = isAutoOpen;
     const concurrencySlider = document.getElementById(
       "setting-concurrency",
     ) as HTMLInputElement;
@@ -295,6 +304,14 @@ export async function setupUI() {
           "concurrencyLimit",
           parseInt(concurrencySlider.value, 10),
         );
+      }
+      const moveToggle = document.getElementById("setting-file-action") as HTMLInputElement;
+      const openToggle = document.getElementById("setting-auto-open") as HTMLInputElement;
+      if (moveToggle) {
+        await appState.store?.set("moveFilesEnabled", moveToggle.checked);
+      }
+      if (openToggle) {
+        await appState.store?.set("autoOpenExcel", openToggle.checked);
       }
 
       await appState.store?.save();

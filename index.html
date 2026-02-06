@@ -126,10 +126,34 @@
       </div>
 
       <div class="form-group">
-        <label>Percorso per i PDF elaborati (opzionale):</label>
+        <label>Percorso di destinazione per spostare o copiare i PDF (opzionale):</label>
         <div class="input-group">
           <input type="text" id="setting-processed-pdf-path" class="input-field" placeholder="Non selezionato">
           <button id="setting-select-processed-pdf" class="btn btn-secondary">Selezionare</button>
+        </div>
+      </div>
+
+      <div class="form-group"
+        style="margin-top: 15px; display: flex; align-items: center; justify-content: space-between;">
+        <label>Azione file PDF</label>
+        <div class="switch-container">
+          <span class="switch-label">Copia</span>
+          <label class="switch">
+            <input type="checkbox" id="setting-file-action">
+            <span class="slider round"></span>
+          </label>
+          <span class="switch-label">Sposta</span>
+        </div>
+      </div>
+
+      <div class="form-group"
+        style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+        <label for="setting-auto-open">Apri Excel dopo l'esportazione</label>
+        <div class="theme-toggle">
+          <input type="checkbox" id="setting-auto-open" class="theme-toggle-input">
+          <label for="setting-auto-open" class="theme-toggle-label">
+            <span class="theme-toggle-inner"></span>
+          </label>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 mod modules;
-use modules::{ai, config, excel, ui};
+use modules::{ai, config, excel, ui, utils};
 
 use std::env;
 
@@ -22,6 +22,7 @@ pub fn run() {
             config::move_files,
             excel::check_excel_access,
             ui::set_taskbar_progress,
+            utils::copy_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

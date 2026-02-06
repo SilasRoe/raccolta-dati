@@ -1,4 +1,4 @@
-use crate::modules::utils::{adjust_formula, parse_date, token_similarity};
+use crate::modules::utils::{adjust_formula, close_excel_if_open, parse_date, token_similarity};
 
 use chrono::NaiveDate;
 use serde_json::json;
@@ -97,6 +97,11 @@ pub async fn export_to_excel(
             None => return Ok("Interruzione da parte dell'utente".to_string()),
         }
     };
+    if let Some(path_str) = path_buf.to_str() {
+        close_excel_if_open(path_str);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     let path = path_buf.as_path();
 
     if let Err(_) = OpenOptions::new().write(true).open(path) {
@@ -443,27 +448,73 @@ pub async fn export_to_excel(
 
             sheet.insert_new_row(&start_row, &count);
 
-            let (template_row, formula_source_row) = if start_row > start_data_row {
-                (start_row - 1, start_row - 1)
+            let current_highest = sheet.get_highest_row();
+
+            let mut template_row_idx = if start_row > start_data_row {
+                start_row - 1
             } else {
-                (start_row + count, start_row + count)
+                start_row + count
             };
 
-            let mut column_styles = Vec::with_capacity(18);
-            for col in 1..=18 {
-                column_styles.push(sheet.get_style((col, template_row)).clone());
+            let mut found_ref = false;
+            if start_row > start_data_row {
+                for r in (start_data_row..start_row).rev() {
+                    if !sheet.get_value((2, r)).trim().is_empty() {
+                        template_row_idx = r;
+                        found_ref = true;
+                        break;
+                    }
+                }
+            }
+            if !found_ref {
+                for r in (start_row + count)..=current_highest {
+                    if !sheet.get_value((2, r)).trim().is_empty() {
+                        template_row_idx = r;
+                        break;
+                    }
+                }
             }
 
             let (template_height, template_custom_height) =
-                match sheet.get_row_dimension(&template_row) {
+                match sheet.get_row_dimension(&template_row_idx) {
                     Some(row_dim) => (*row_dim.get_height(), *row_dim.get_custom_height()),
                     None => (0.0, false),
                 };
 
-            let template_formula = match sheet.get_cell((13, template_row)) {
+            let template_formula = match sheet.get_cell((13, template_row_idx)) {
                 Some(c) => c.get_formula().to_string(),
                 None => String::new(),
             };
+            let formula_source_row = template_row_idx;
+
+            let mut column_styles = Vec::with_capacity(18);
+            for col in 1..=18 {
+                let mut style_found = None;
+
+                if start_row > start_data_row {
+                    for r in (start_data_row..start_row).rev() {
+                        if !sheet.get_value((col, r)).trim().is_empty() {
+                            style_found = Some(sheet.get_style((col, r)).clone());
+                            break;
+                        }
+                    }
+                }
+
+                if style_found.is_none() {
+                    for r in (start_row + count)..=current_highest {
+                        if !sheet.get_value((col, r)).trim().is_empty() {
+                            style_found = Some(sheet.get_style((col, r)).clone());
+                            break;
+                        }
+                    }
+                }
+
+                if style_found.is_none() {
+                    style_found = Some(sheet.get_style((col, template_row_idx)).clone());
+                }
+
+                column_styles.push(style_found.unwrap());
+            }
 
             for (i, row_data) in batch.iter().enumerate() {
                 let r = start_row + i as u32;

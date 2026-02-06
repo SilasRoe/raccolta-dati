@@ -31,6 +31,10 @@ export const api = {
 
   setTaskbarProgress: (progress: number, total: number) =>
     invoke("set_taskbar_progress", { progress, total }),
+
+  copyFiles: async (files: string[], targetDir: string) => {
+    return await invoke("copy_files", { filePaths: files, targetDir });
+  },
 };
 
 export async function handleReseachStart() {
