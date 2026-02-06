@@ -25,7 +25,20 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.ico"],
-    "externalBin": ["binaries/pdftotext"]
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/pdftotext"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/silasroe/raccolta-dati/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEQkMwRkY2QjY0MDUxNEQKUldSTlVVQzI5Zys4TFphS05GQWdsamV1SSsrT0ozU2N0b3ZrelBvTjRmQVhCWW5GYmNJOGdHc3UK"
+    }
   }
 }
