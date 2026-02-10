@@ -11,10 +11,38 @@ import { createGrid, setupHeaderCheckbox, handleExportExcel } from "./grid";
 
 import { Store } from "@tauri-apps/plugin-store";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { check } from "@tauri-apps/plugin-updater";
+import { open, ask } from "@tauri-apps/plugin-dialog";
+
+async function checkForAppUpdates() {
+  try {
+    const update = await check();
+    if (update && update.available) {
+      console.log(`Aggiornamento disponibile alla versione ${update.version}!`);
+      const yes = await ask(
+        `Una nuova versione (${update.version}) è disponibile!\n\nVuoi scaricarla e installarla ora?\n\nNote di rilascio:\n${update.body}`,
+        {
+          title: 'Update disponibile',
+          kind: 'info',
+          okLabel: 'Sì, aggiornamento',
+          cancelLabel: 'Più tardi'
+        }
+      );
+
+      if (yes) {
+        await update.downloadAndInstall();
+      }
+    }
+  } catch (error) {
+    console.error("Errore durante il controllo degli aggiornamenti:", error);
+  }
+}
 
 export async function setupUI() {
   api.setTaskbarProgress(0, 0).catch(() => { });
+
+  checkForAppUpdates();
+
   const container = document.querySelector("#data-grid");
   if (!container) return;
 
