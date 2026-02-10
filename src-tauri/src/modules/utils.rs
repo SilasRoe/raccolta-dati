@@ -1,7 +1,6 @@
 use chrono::NaiveDate;
 use regex::Regex;
 use serde_json::{json, Value};
-use std::collections::HashSet;
 use tauri::command;
 
 #[command]
@@ -56,7 +55,7 @@ pub fn close_excel_if_open(path: &str) {
     }
 }
 
-fn tokenize(s: &str) -> HashSet<String> {
+fn tokenize(s: &str) -> Vec<String> {
     s.split_whitespace()
         .map(|w| {
             w.trim_matches(|c: char| !c.is_alphanumeric())
@@ -66,22 +65,76 @@ fn tokenize(s: &str) -> HashSet<String> {
         .collect()
 }
 
+fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+    let v1: Vec<char> = s1.chars().collect();
+    let v2: Vec<char> = s2.chars().collect();
+    let len1 = v1.len();
+    let len2 = v2.len();
+
+    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+
+    for i in 0..=len1 {
+        matrix[i][0] = i;
+    }
+    for j in 0..=len2 {
+        matrix[0][j] = j;
+    }
+
+    for i in 0..len1 {
+        for j in 0..len2 {
+            let cost = if v1[i] == v2[j] { 0 } else { 1 };
+            matrix[i + 1][j + 1] = std::cmp::min(
+                std::cmp::min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1),
+                matrix[i][j] + cost,
+            );
+        }
+    }
+
+    matrix[len1][len2]
+}
+
 pub fn token_similarity(s1: &str, s2: &str) -> f64 {
     let t1 = tokenize(s1);
-    let t2 = tokenize(s2);
+    let mut t2 = tokenize(s2);
 
+    if t1.is_empty() && t2.is_empty() {
+        return 1.0;
+    }
     if t1.is_empty() || t2.is_empty() {
         return 0.0;
     }
 
-    let intersection_count = t1.intersection(&t2).count();
-    let union_count = t1.union(&t2).count();
+    let total_words = (t1.len() + t2.len()) as f64;
+    let mut matches = 0.0;
 
-    if union_count == 0 {
-        return 0.0;
+    for w1 in &t1 {
+        let mut best_score = 0.0;
+        let mut best_idx = None;
+
+        for (i, w2) in t2.iter().enumerate() {
+            let dist = levenshtein_distance(w1, w2);
+            let max_len = w1.chars().count().max(w2.chars().count());
+            let score = if max_len == 0 {
+                1.0
+            } else {
+                1.0 - (dist as f64 / max_len as f64)
+            };
+
+            if score > best_score {
+                best_score = score;
+                best_idx = Some(i);
+            }
+        }
+
+        if best_score > 0.65 {
+            matches += best_score;
+            if let Some(idx) = best_idx {
+                t2.remove(idx);
+            }
+        }
     }
 
-    intersection_count as f64 / union_count as f64
+    (2.0 * matches) / total_words
 }
 
 pub fn parse_date(date_str: &str) -> Option<NaiveDate> {
