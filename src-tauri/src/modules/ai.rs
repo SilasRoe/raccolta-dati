@@ -2,7 +2,6 @@ use crate::modules::config::get_api_key;
 use crate::modules::utils::format_to_uppercase;
 
 use base64::{engine::general_purpose, Engine as _};
-use dotenv::dotenv;
 use keepawake;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -164,7 +163,6 @@ pub async fn analyze_document(
         .create()
         .map_err(|e| format!("Impossibile attivare la gestione dell'alimentazione: {}", e))?;
 
-    dotenv().ok();
     let api_key = get_api_key().await?;
 
     if api_key.trim().is_empty() {
