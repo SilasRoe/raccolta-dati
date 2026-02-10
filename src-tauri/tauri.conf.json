@@ -26,6 +26,19 @@
     "active": true,
     "targets": "all",
     "icon": ["icons/icon.ico"],
-    "externalBin": ["binaries/pdftotext"]
+    "externalBin": ["binaries/pdftotext"],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEMEM1MjhDNjhBNzFEOEYKUldTUEhhZG9qRklNbmVyWExLRmpyTEZkZEdBUUM1ZHF2VXFPR3ZNZUxxTEFYdWg2VFZ5WG15RGMK",
+      "endpoints": [
+        "https://releases.myapp.com/{{target}}/{{arch}}/{{current_version}}",
+        "https://github.com/SilasRoe/raccolta-dati/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "basicUi"
+      }
+    }
   }
 }
