@@ -159,6 +159,7 @@ pub async fn export_to_excel(
         product_norm: String,
         qty: f64,
         price: f64,
+        has_invoice: bool,
     }
 
     let mut order_map: HashMap<String, Vec<ExcelCandidate>> = HashMap::new();
@@ -182,11 +183,15 @@ pub async fn export_to_excel(
             });
 
             if !o_val.is_empty() {
+                let inv_qty_str = sheet.get_value((12, r));
+                let has_invoice = !inv_qty_str.trim().is_empty();
+
                 order_map.entry(o_val).or_default().push(ExcelCandidate {
                     row_idx: r,
                     product_norm: p_name,
                     qty: qty_val,
                     price: price_val,
+                    has_invoice,
                 });
             }
         }
@@ -209,10 +214,15 @@ pub async fn export_to_excel(
 
         let mut best_match_excel: Option<u32> = None;
         let mut best_score_excel: f64 = -1.0;
+        let mut best_cand_idx: Option<usize> = None;
 
         if let (Some(inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
             if let Some(candidates) = order_map.get(&order_nr) {
-                for cand in candidates {
+                for (i, cand) in candidates.iter().enumerate() {
+                    if cand.has_invoice {
+                        continue;
+                    }
+
                     if (cand.price - inv_price).abs() > 0.05 {
                         continue;
                     }
@@ -235,19 +245,30 @@ pub async fn export_to_excel(
                     if total_score > best_score_excel {
                         best_score_excel = total_score;
                         best_match_excel = Some(cand.row_idx);
+                        best_cand_idx = Some(i);
                     }
                 }
             }
         } else {
             if let Some(candidates) = order_map.get(&order_nr) {
-                if let Some(exact) = candidates
-                    .iter()
-                    .find(|c| c.product_norm.trim().eq_ignore_ascii_case(prod_name.trim()))
-                {
-                    best_match_excel = Some(exact.row_idx);
+                let mut best_score_order = 0.5;
+                for (i, cand) in candidates.iter().enumerate() {
+                    let name_sim = token_similarity(&prod_name, &cand.product_norm);
+                    if name_sim > best_score_order {
+                        best_score_order = name_sim;
+                        best_match_excel = Some(cand.row_idx);
+                        best_cand_idx = Some(i);
+                    }
                 }
             }
         }
+
+        if let Some(idx) = best_cand_idx {
+            if let Some(candidates) = order_map.get_mut(&order_nr) {
+                candidates[idx].has_invoice = true;
+            }
+        }
+
         if let Some(row_idx) = best_match_excel {
             if let Some(v) = &row.datum_auftrag {
                 sheet.get_cell_mut((1, row_idx)).set_value(v);
