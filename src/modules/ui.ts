@@ -12,29 +12,28 @@ import { createGrid, setupHeaderCheckbox, handleExportExcel } from "./grid";
 import { Store } from "@tauri-apps/plugin-store";
 import { listen } from "@tauri-apps/api/event";
 import { check } from "@tauri-apps/plugin-updater";
-import { open, ask } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 
 async function checkForAppUpdates() {
   try {
-    const update = await check();
+    const update = await check()
     if (update && update.available) {
-      console.log(`Aggiornamento disponibile alla versione ${update.version}!`);
-      const yes = await ask(
+      console.log(`Aggiornamento disponibile alla versione ${update.version}!`)
+
+      const yes = await showCustomConfirm(
         `Una nuova versione (${update.version}) è disponibile!\n\nVuoi scaricarla e installarla ora?\n\nNote di rilascio:\n${update.body}`,
-        {
-          title: 'Update disponibile',
-          kind: 'info',
-          okLabel: 'Sì, aggiornamento',
-          cancelLabel: 'Più tardi'
-        }
-      );
+        "Update disponibile",
+        "Sì, aggiornamento",
+        "Più tardi",
+        false
+      )
 
       if (yes) {
-        await update.downloadAndInstall();
+        await update.downloadAndInstall()
       }
     }
   } catch (error) {
-    console.error("Errore durante il controllo degli aggiornamenti:", error);
+    console.error("Errore durante il controllo degli aggiornamenti:", error)
   }
 }
 
@@ -140,15 +139,18 @@ export async function setupUI() {
     selectFolderBtn.addEventListener("click", handleSelectFolder);
   }
   if (startResearchBtn) {
-    appState.controller = new AbortController();
-    const signal = appState.controller.signal;
+    appState.controller = new AbortController()
+    const signal = appState.controller.signal
     startResearchBtn.addEventListener(
       "click",
-      () => {
-        handleReseachStart();
+      async () => {
+        const confirmed = await showCustomConfirm("Vuoi avviare la raccolta dati?\n\nAttenzione: i dati non esportati andranno persi.")
+        if (confirmed) {
+          handleReseachStart()
+        }
       },
-      { signal: signal },
-    );
+      { signal: signal }
+    )
   }
 
   if (themeToggle) {
@@ -501,4 +503,69 @@ export function toggleTheme(forceTheme?: "light" | "dark") {
     themeToggle.checked = isChecked;
     themeToggle.setAttribute("aria-checked", String(isChecked));
   }
+}
+
+export function showCustomConfirm(
+  message: string,
+  title: string = "Attenzione",
+  confirmText: string = "Avvia",
+  cancelText: string = "Annulla",
+  isWarning: boolean = true
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div")
+    overlay.className = "modal-overlay"
+    overlay.style.zIndex = "3000"
+
+    const content = document.createElement("div")
+    content.className = "modal-content"
+    content.style.width = "400px"
+
+    const titleEl = document.createElement("h2")
+    titleEl.className = "modal-title"
+    titleEl.textContent = title
+    if (isWarning) titleEl.style.color = "var(--error-color)"
+
+    const messageEl = document.createElement("p")
+    messageEl.textContent = message
+    messageEl.style.whiteSpace = "pre-wrap"
+    messageEl.style.maxHeight = "60vh"
+    messageEl.style.overflowY = "auto"
+
+    const actions = document.createElement("div")
+    actions.className = "modal-actions"
+    actions.style.marginTop = "20px"
+
+    const cancelBtn = document.createElement("button")
+    cancelBtn.className = "btn btn-ghost"
+    cancelBtn.textContent = cancelText
+
+    const confirmBtn = document.createElement("button")
+    confirmBtn.className = "btn btn-primary"
+    confirmBtn.textContent = confirmText
+    if (isWarning) {
+      confirmBtn.style.backgroundColor = "var(--error-color)"
+      confirmBtn.style.borderColor = "var(--error-color)"
+    }
+
+    cancelBtn.onclick = () => {
+      document.body.removeChild(overlay)
+      resolve(false)
+    }
+
+    confirmBtn.onclick = () => {
+      document.body.removeChild(overlay)
+      resolve(true)
+    }
+
+    actions.appendChild(cancelBtn)
+    actions.appendChild(confirmBtn)
+
+    content.appendChild(titleEl)
+    content.appendChild(messageEl)
+    content.appendChild(actions)
+    overlay.appendChild(content)
+
+    document.body.appendChild(overlay)
+  })
 }

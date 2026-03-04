@@ -282,9 +282,6 @@ pub async fn export_to_excel(
             if let Some(v) = &row.lieferant {
                 sheet.get_cell_mut((4, row_idx)).set_value(v);
             }
-            if let Some(v) = &row.produkt {
-                sheet.get_cell_mut((5, row_idx)).set_value(v);
-            }
             if let Some(v) = row.menge {
                 sheet.get_cell_mut((6, row_idx)).set_value_number(v);
             }
@@ -392,29 +389,28 @@ pub async fn export_to_excel(
 
     if !rows_to_insert.is_empty() {
         rows_to_insert.sort_by(|a, b| {
-            let res = a
+            let res_l = a
                 .lieferant
                 .as_deref()
                 .unwrap_or("")
                 .to_lowercase()
                 .cmp(&b.lieferant.as_deref().unwrap_or("").to_lowercase());
-            if res != std::cmp::Ordering::Equal {
-                return res;
-            }
-
-            let res = a
-                .nummer_auftrag
-                .as_deref()
-                .unwrap_or("")
-                .to_lowercase()
-                .cmp(&b.nummer_auftrag.as_deref().unwrap_or("").to_lowercase());
-            if res != std::cmp::Ordering::Equal {
-                return res;
+            if res_l != std::cmp::Ordering::Equal {
+                return res_l;
             }
 
             let date_a = parse_date(a.datum_auftrag.as_deref().unwrap_or_default());
             let date_b = parse_date(b.datum_auftrag.as_deref().unwrap_or_default());
-            date_a.cmp(&date_b)
+            let res_d = date_a.cmp(&date_b);
+            if res_d != std::cmp::Ordering::Equal {
+                return res_d;
+            }
+
+            a.nummer_auftrag
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .cmp(&b.nummer_auftrag.as_deref().unwrap_or("").to_lowercase())
         });
 
         let mut insertions: BTreeMap<u32, Vec<ExportRow>> = BTreeMap::new();
@@ -442,10 +438,10 @@ pub async fn export_to_excel(
             for ex in &existing_rows_for_sorting {
                 if ex.supplier == target_supplier {
                     found_supplier_block = true;
-                    if ex.order_number > target_order {
+                    if ex.date > target_date {
                         insert_at = ex.row_idx;
                         break;
-                    } else if ex.order_number == target_order && ex.date > target_date {
+                    } else if ex.date == target_date && ex.order_number > target_order {
                         insert_at = ex.row_idx;
                         break;
                     }
@@ -457,6 +453,7 @@ pub async fn export_to_excel(
                     break;
                 }
             }
+
             insertions
                 .entry(insert_at)
                 .or_default()

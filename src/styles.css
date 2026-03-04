@@ -194,8 +194,9 @@ button:disabled {
   background-color: var(--button-hover-bg, #8c8b8b);
 }
 
-#start-process-btn {
-  color: #4caf50;
+#start-process-btn svg {
+  stroke: red;
+  stroke-width: 5px;
 }
 
 .btn {
