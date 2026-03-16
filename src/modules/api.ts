@@ -64,6 +64,8 @@ export async function handleReseachStart() {
     let completedCount = 0;
     setProgress(0, totalTasks);
 
+    const corrections = await api.getCorrections().catch(() => ({} as Record<string, string>))
+
     const aiResults: any[] = new Array(data.length).fill(null);
     let cursor = 0;
 
@@ -181,7 +183,19 @@ export async function handleReseachStart() {
               newRow.warnings = originalRow.warnings || false;
             }
 
-            newRow.produkt = prod.produkt;
+            let finalProdukt = prod.produkt
+
+            if (typeof finalProdukt === "string") {
+              finalProdukt = finalProdukt.toUpperCase().trim()
+              for (const [wrong, right] of Object.entries(corrections)) {
+                if (wrong.toUpperCase().trim() === finalProdukt) {
+                  finalProdukt = right.toUpperCase()
+                  break
+                }
+              }
+            }
+
+            newRow.produkt = finalProdukt
 
             if (docType === "auftrag") {
               newRow.menge = prod.menge;

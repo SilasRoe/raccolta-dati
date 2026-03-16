@@ -13,6 +13,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { listen } from "@tauri-apps/api/event";
 import { check } from "@tauri-apps/plugin-updater";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getVersion } from "@tauri-apps/api/app"
 
 async function checkForAppUpdates() {
   try {
@@ -363,6 +364,17 @@ export async function setupUI() {
     }
   });
 
+  document.addEventListener("keydown", (e) => {
+    if (settingsModal?.style.display === "flex") {
+      if (e.key === "Escape") {
+        closeSettingsBtn?.click()
+      } else if (e.key === "Enter") {
+        e.preventDefault()
+        saveSettingsBtn?.click()
+      }
+    }
+  })
+
   appState.store?.get<string>("defaultTheme").then((theme) => {
     if (theme) {
       document.documentElement.setAttribute("data-theme", theme);
@@ -404,6 +416,15 @@ export async function setupUI() {
       );
     }
   });
+
+  getVersion()
+    .then(version => {
+      const versionEl = document.getElementById("app-version")
+      if (versionEl) {
+        versionEl.textContent = version
+      }
+    })
+    .catch(console.error)
 }
 
 export function showToast(
@@ -548,15 +569,25 @@ export function showCustomConfirm(
       confirmBtn.style.borderColor = "var(--error-color)"
     }
 
-    cancelBtn.onclick = () => {
+    const cleanup = (result: boolean) => {
+      document.removeEventListener("keydown", handleKeydown)
       document.body.removeChild(overlay)
-      resolve(false)
+      resolve(result)
     }
 
-    confirmBtn.onclick = () => {
-      document.body.removeChild(overlay)
-      resolve(true)
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        cleanup(false)
+      } else if (e.key === "Enter") {
+        e.preventDefault()
+        cleanup(true)
+      }
     }
+
+    cancelBtn.onclick = () => cleanup(false)
+    confirmBtn.onclick = () => cleanup(true)
+
+    document.addEventListener("keydown", handleKeydown)
 
     actions.appendChild(cancelBtn)
     actions.appendChild(confirmBtn)

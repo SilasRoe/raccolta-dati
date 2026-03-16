@@ -104,8 +104,9 @@ pub fn token_similarity(s1: &str, s2: &str) -> f64 {
         return 0.0;
     }
 
-    let total_words = (t1.len() + t2.len()) as f64;
-    let mut matches = 0.0;
+    let mut matched_weight = 0.0;
+    let weight_t1: usize = t1.iter().map(|w| w.chars().count()).sum();
+    let weight_t2: usize = t2.iter().map(|w| w.chars().count()).sum();
 
     for w1 in &t1 {
         let mut best_score = 0.0;
@@ -114,6 +115,7 @@ pub fn token_similarity(s1: &str, s2: &str) -> f64 {
         for (i, w2) in t2.iter().enumerate() {
             let dist = levenshtein_distance(w1, w2);
             let max_len = w1.chars().count().max(w2.chars().count());
+
             let score = if max_len == 0 {
                 1.0
             } else {
@@ -126,15 +128,21 @@ pub fn token_similarity(s1: &str, s2: &str) -> f64 {
             }
         }
 
-        if best_score > 0.65 {
-            matches += best_score;
+        if best_score > 0.6 {
+            matched_weight += (w1.chars().count() as f64) * best_score;
             if let Some(idx) = best_idx {
                 t2.remove(idx);
             }
         }
     }
 
-    (2.0 * matches) / total_words
+    let max_weight = weight_t1.max(weight_t2) as f64;
+
+    if max_weight == 0.0 {
+        1.0
+    } else {
+        matched_weight / max_weight
+    }
 }
 
 pub fn parse_date(date_str: &str) -> Option<NaiveDate> {

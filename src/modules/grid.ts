@@ -130,40 +130,36 @@ export function createGrid(container: Element): Handsontable {
       setupHeaderCheckbox();
     },
     afterChange(changes, source) {
-      if (!changes) return;
+      if (!changes) return
 
       if (
         source === "loadData" ||
         source === "timeValidate" ||
-        source === "dateValidate"
-      )
-        return;
+        source === "dateValidate" ||
+        (source as string) === "reAnalyze"
+      ) return
 
       for (const c of changes) {
-        const prop = c[1];
-        const oldVal = c[2];
-        const newVal = c[3];
+        const prop = c[1]
+        const oldVal = c[2]
+        const newVal = c[3]
 
         if (prop === "confirmed") {
-          updateHeaderCheckboxState();
+          updateHeaderCheckboxState()
         }
+
         if (
           prop === "produkt" &&
-          (source === "edit" || source === "Autofill.fill")
+          ["edit", "Autofill.fill", "CopyPaste.paste"].includes(source)
         ) {
-          if (
-            oldVal &&
-            newVal &&
-            oldVal !== newVal &&
-            typeof oldVal === "string" &&
-            typeof newVal === "string"
-          ) {
+          const cleanOld = typeof oldVal === "string" ? oldVal.trim() : oldVal
+          const cleanNew = typeof newVal === "string" ? newVal.trim() : newVal
+
+          if (cleanOld && cleanNew && cleanOld !== cleanNew) {
             api
-              .learnCorrection(oldVal, newVal)
-              .then(() => {
-                console.log(`Imparato: "${oldVal}" -> "${newVal}"`);
-              })
-              .catch((err) => console.error("Errori di apprendimento:", err));
+              .learnCorrection(cleanOld, cleanNew)
+              .then(() => console.log(`Imparato: "${cleanOld}" -> "${cleanNew}"`))
+              .catch((err) => console.error("Errori di apprendimento:", err))
           }
         }
       }
@@ -259,7 +255,20 @@ async function reAnalyzeRow(row: number) {
   try {
     const result = await api.analyzeDocument(rowData.fullPath, rowData.docType);
 
-    const products = result.produkte;
+    const products = result.produkte
+
+    const corrections = await api.getCorrections().catch(() => ({} as Record<string, string>))
+
+    const applyCorrection = (name: string) => {
+      if (typeof name !== "string") return name
+      const upperName = name.toUpperCase().trim()
+      for (const [wrong, right] of Object.entries(corrections)) {
+        if (wrong.toUpperCase().trim() === upperName) {
+          return right.toUpperCase()
+        }
+      }
+      return upperName
+    }
 
     const toUpper = (str: any) => (str && typeof str === 'string') ? str.toUpperCase() : str;
 
@@ -267,7 +276,7 @@ async function reAnalyzeRow(row: number) {
       appState.hot.batch(() => {
         const firstProd = products[0];
 
-        appState.hot!.setDataAtRowProp(row, "produkt", toUpper(firstProd.produkt));
+        appState.hot!.setDataAtRowProp(row, "produkt", applyCorrection(toUpper(firstProd.produkt)), "reAnalyze" as any);
 
         if (rowData.docType === "auftrag") {
           appState.hot!.setDataAtRowProp(row, "menge", toUpper(firstProd.menge));
@@ -288,7 +297,7 @@ async function reAnalyzeRow(row: number) {
           extraProducts.forEach((prod, i) => {
             const newRowIdx = row + 1 + i;
 
-            appState.hot!.setDataAtRowProp(newRowIdx, "produkt", prod.produkt);
+            appState.hot!.setDataAtRowProp(newRowIdx, "produkt", applyCorrection(toUpper(prod.produkt)), "reAnalyze" as any);
 
             if (rowData.docType === "auftrag") {
               appState.hot!.setDataAtRowProp(newRowIdx, "menge", prod.menge);

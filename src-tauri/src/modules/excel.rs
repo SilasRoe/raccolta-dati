@@ -120,6 +120,19 @@ pub async fn export_to_excel(
         println!("INFO: Datei verwendet 1904-Datumssystem. Daten werden migriert.");
     }
 
+    let date_to_excel = |d: &str| -> Option<f64> {
+        if let Some(parsed) = parse_date(d) {
+            let epoch = if is_1904 {
+                NaiveDate::from_ymd_opt(1904, 1, 1).unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(1899, 12, 30).unwrap()
+            };
+            Some((parsed - epoch).num_days() as f64)
+        } else {
+            None
+        }
+    };
+
     let mut book = umya_spreadsheet::reader::xlsx::read(path)
         .map_err(|e| format!("Errore di lettura: {}", e))?;
 
@@ -158,7 +171,6 @@ pub async fn export_to_excel(
         row_idx: u32,
         product_norm: String,
         qty: f64,
-        price: f64,
         has_invoice: bool,
     }
 
@@ -173,7 +185,6 @@ pub async fn export_to_excel(
             let p_name = sheet.get_value((5, r)).to_string();
 
             let qty_val = sheet.get_value((6, r)).parse::<f64>().unwrap_or(0.0);
-            let price_val = sheet.get_value((8, r)).parse::<f64>().unwrap_or(0.0);
 
             existing_rows_for_sorting.push(SheetRow {
                 row_idx: r,
@@ -190,7 +201,6 @@ pub async fn export_to_excel(
                     row_idx: r,
                     product_norm: p_name,
                     qty: qty_val,
-                    price: price_val,
                     has_invoice,
                 });
             }
@@ -216,14 +226,10 @@ pub async fn export_to_excel(
         let mut best_score_excel: f64 = -1.0;
         let mut best_cand_idx: Option<usize> = None;
 
-        if let (Some(inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
+        if let (Some(_inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
             if let Some(candidates) = order_map.get(&order_nr) {
                 for (i, cand) in candidates.iter().enumerate() {
                     if cand.has_invoice {
-                        continue;
-                    }
-
-                    if (cand.price - inv_price).abs() > 0.05 {
                         continue;
                     }
 
@@ -270,18 +276,6 @@ pub async fn export_to_excel(
         }
 
         if let Some(row_idx) = best_match_excel {
-            if let Some(v) = &row.datum_auftrag {
-                sheet.get_cell_mut((1, row_idx)).set_value(v);
-            }
-            if let Some(v) = &row.nummer_auftrag {
-                sheet.get_cell_mut((2, row_idx)).set_value(v);
-            }
-            if let Some(v) = &row.kunde {
-                sheet.get_cell_mut((3, row_idx)).set_value(v);
-            }
-            if let Some(v) = &row.lieferant {
-                sheet.get_cell_mut((4, row_idx)).set_value(v);
-            }
             if let Some(v) = row.menge {
                 sheet.get_cell_mut((6, row_idx)).set_value_number(v);
             }
@@ -291,9 +285,14 @@ pub async fn export_to_excel(
             if let Some(v) = row.preis {
                 sheet.get_cell_mut((8, row_idx)).set_value_number(v);
             }
-
             if let Some(v) = &row.datum_rechnung {
-                sheet.get_cell_mut((10, row_idx)).set_value(v);
+                if let Some(excel_date) = date_to_excel(v) {
+                    sheet
+                        .get_cell_mut((10, row_idx))
+                        .set_value_number(excel_date);
+                } else {
+                    sheet.get_cell_mut((10, row_idx)).set_value(v);
+                }
             }
             if let Some(v) = &row.nummer_rechnung {
                 sheet.get_cell_mut((11, row_idx)).set_value(v);
@@ -310,7 +309,7 @@ pub async fn export_to_excel(
         } else {
             let mut found_in_pending = false;
 
-            if let (Some(inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
+            if let (Some(_inv_price), Some(inv_qty)) = (row.preis, row.gelieferte_menge) {
                 let mut best_idx_pending = None;
                 let mut best_score_pending = -1.0;
 
@@ -326,11 +325,6 @@ pub async fn export_to_excel(
                         .trim()
                         .to_lowercase();
                     if pending_nr != order_nr {
-                        continue;
-                    }
-
-                    let pending_price = pending.preis.unwrap_or(0.0);
-                    if (pending_price - inv_price).abs() > 0.05 {
                         continue;
                     }
 
@@ -363,6 +357,11 @@ pub async fn export_to_excel(
                     target.datum_rechnung = row.datum_rechnung.clone();
                     target.nummer_rechnung = row.nummer_rechnung.clone();
                     target.gelieferte_menge = Some(inv_qty);
+
+                    if let Some(inv_p) = row.preis {
+                        target.preis = Some(inv_p);
+                    }
+
                     if let Some(note) = &row.anmerkungen {
                         if target.anmerkungen.is_none() {
                             target.anmerkungen = Some(note.clone());
@@ -546,7 +545,11 @@ pub async fn export_to_excel(
                 }
 
                 if let Some(v) = &row_data.datum_auftrag {
-                    sheet.get_cell_mut((1, r)).set_value(v);
+                    if let Some(excel_date) = date_to_excel(v) {
+                        sheet.get_cell_mut((1, r)).set_value_number(excel_date);
+                    } else {
+                        sheet.get_cell_mut((1, r)).set_value(v);
+                    }
                 }
                 if let Some(v) = &row_data.nummer_auftrag {
                     sheet.get_cell_mut((2, r)).set_value(v);
@@ -570,7 +573,11 @@ pub async fn export_to_excel(
                     sheet.get_cell_mut((8, r)).set_value_number(v);
                 }
                 if let Some(v) = &row_data.datum_rechnung {
-                    sheet.get_cell_mut((10, r)).set_value(v);
+                    if let Some(excel_date) = date_to_excel(v) {
+                        sheet.get_cell_mut((10, r)).set_value_number(excel_date);
+                    } else {
+                        sheet.get_cell_mut((10, r)).set_value(v);
+                    }
                 }
                 if let Some(v) = &row_data.nummer_rechnung {
                     sheet.get_cell_mut((11, r)).set_value(v);
