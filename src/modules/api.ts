@@ -69,6 +69,60 @@ export async function handleReseachStart() {
     const aiResults: any[] = new Array(data.length).fill(null);
     let cursor = 0;
 
+    const renderLiveUpdate = () => {
+      const newTableData: PdfDataRow[] = []
+
+      data.forEach((originalRow, rowIndex) => {
+        const processedItem = aiResults[rowIndex]
+
+        if (processedItem && processedItem.result) {
+          const aiResult = processedItem.result
+          const products = aiResult.produkte
+          const docType = processedItem.docType
+
+          if (products && Array.isArray(products) && products.length > 0) {
+            products.forEach((prod: any, prodIndex: number) => {
+              const newRow: PdfDataRow = { ...originalRow }
+              if (prodIndex > 0) {
+                newRow.pdfName = ""
+                newRow.fullPath = ""
+                newRow.confirmed = false
+              }
+
+              let finalProdukt = prod.produkt
+              if (typeof finalProdukt === "string") {
+                finalProdukt = finalProdukt.toUpperCase().trim()
+                for (const [wrong, right] of Object.entries(corrections)) {
+                  if (wrong.toUpperCase().trim() === finalProdukt) {
+                    finalProdukt = right.toUpperCase()
+                    break
+                  }
+                }
+              }
+
+              newRow.produkt = finalProdukt
+              if (docType === "auftrag") {
+                newRow.menge = prod.menge
+                newRow.waehrung = prod.waehrung
+                newRow.preis = prod.preis
+              } else {
+                newRow.gelieferteMenge = prod.gelieferteMenge
+                newRow.nummerRechnung = aiResult.nummerRechnung
+                newRow.preis = prod.preis
+              }
+              newTableData.push(newRow)
+            })
+          } else {
+            newTableData.push({ ...originalRow, warnings: true })
+          }
+        } else {
+          newTableData.push(originalRow)
+        }
+      })
+
+      appState.hot!.loadData(newTableData)
+    }
+
     if (concurrencyLimit === 0) {
       const taskChunks = chunk(tasks, 3);
 
@@ -89,6 +143,7 @@ export async function handleReseachStart() {
                 docType: task.row.docType,
                 result,
               };
+              renderLiveUpdate()
             } catch (err) {
               console.error(`Fehler bei Zeile ${task.index}:`, err);
 
@@ -137,6 +192,7 @@ export async function handleReseachStart() {
               docType: task.row.docType,
               result,
             };
+            renderLiveUpdate()
           } catch (err) {
             console.error(`Fehler bei Zeile ${task.index}:`, err);
             appState.hot!.setDataAtRowProp(

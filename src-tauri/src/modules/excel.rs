@@ -121,16 +121,10 @@ pub async fn export_to_excel(
     }
 
     let date_to_excel = |d: &str| -> Option<f64> {
-        if let Some(parsed) = parse_date(d) {
-            let epoch = if is_1904 {
-                NaiveDate::from_ymd_opt(1904, 1, 1).unwrap()
-            } else {
-                NaiveDate::from_ymd_opt(1899, 12, 30).unwrap()
-            };
-            Some((parsed - epoch).num_days() as f64)
-        } else {
-            None
-        }
+        parse_date(d).map(|parsed| {
+            let epoch = NaiveDate::from_ymd_opt(1899, 12, 30).unwrap();
+            (parsed - epoch).num_days() as f64
+        })
     };
 
     let mut book = umya_spreadsheet::reader::xlsx::read(path)
