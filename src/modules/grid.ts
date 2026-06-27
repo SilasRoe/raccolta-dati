@@ -1,6 +1,6 @@
 import { PdfDataRow } from "../types";
 import { appState } from "./state";
-import { setProgress, showToast } from "./ui";
+import { setProgress, showToast, showExportNotification } from "./ui";
 import { api } from "./api";
 
 import Handsontable from "handsontable";
@@ -556,29 +556,30 @@ export async function handleExportExcel() {
       },
     );
 
-    const msg = await api.exportExcel(
+    const result = await api.exportExcel(
       confirmedData,
-      (await appState.store?.get<string>("defaultExcelPath")) || null,
-    );
+      (await appState.store?.get<string>("defaultExcelPath")) || null
+    )
 
-    if (msg !== "Interruzione da parte dell'utente") {
-      showToast(msg, "success");
+    if (result.message !== "Interruzione da parte dell'utente") {
+      showExportNotification(result.message, result.log_data)
 
       const processedDir = await appState.store?.get<string>(
-        "defaultProcessedPdfPath",
-      );
-      const shouldMove = (await appState.store?.get<boolean>("moveFilesEnabled")) !== false;
+        "defaultProcessedPdfPath"
+      )
+      const shouldMove = (await appState.store?.get<boolean>("moveFilesEnabled")) !== false
+
       if (processedDir && pathsToMove.size > 0) {
         try {
           if (shouldMove) {
-            await api.moveFiles(Array.from(pathsToMove), processedDir);
-            showToast(`${pathsToMove.size} PDF spostati.`, "success");
+            await api.moveFiles(Array.from(pathsToMove), processedDir)
+            showToast(`${pathsToMove.size} PDF spostati.`, "success")
           } else {
-            await api.copyFiles(Array.from(pathsToMove), processedDir);
-            showToast(`${pathsToMove.size} PDF copiati.`, "success");
+            await api.copyFiles(Array.from(pathsToMove), processedDir)
+            showToast(`${pathsToMove.size} PDF copiati.`, "success")
           }
         } catch (moveErr) {
-          showToast(`Errore durante lo spostamento: ${moveErr}`, "error");
+          showToast(`Errore durante lo spostamento: ${moveErr}`, "error")
         }
       }
     }

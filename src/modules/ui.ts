@@ -1,4 +1,4 @@
-import { handleReseachStart, api } from "./api";
+import { handleReseachStart, api, LogEntry } from "./api";
 import {
   handleSelectFiles,
   handleSelectFolder,
@@ -599,4 +599,148 @@ export function showCustomConfirm(
 
     document.body.appendChild(overlay)
   })
+}
+
+export const showExportNotification = (message: string, logData: LogEntry[]) => {
+  const container = document.getElementById('notification-container')
+  if (!container) return
+
+  const toast = document.createElement('div')
+  toast.className = 'notification'
+  toast.style.display = 'flex'
+  toast.style.flexDirection = 'row'
+  toast.style.alignItems = 'center'
+  toast.style.justifyContent = 'space-between'
+  toast.style.gap = '16px'
+  toast.style.padding = '12px 16px'
+
+  const textSpan = document.createElement('span')
+  textSpan.textContent = message
+  textSpan.style.flexGrow = '1'
+  toast.appendChild(textSpan)
+
+  const actionContainer = document.createElement('div')
+  actionContainer.style.display = 'flex'
+  actionContainer.style.flexDirection = 'row'
+  actionContainer.style.alignItems = 'center'
+  actionContainer.style.gap = '12px'
+
+  if (logData.length > 0) {
+    const logBtn = document.createElement('button')
+    logBtn.className = 'log-btn'
+    logBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+    `
+    logBtn.onclick = () => openLogModal(logData)
+    actionContainer.appendChild(logBtn)
+  }
+
+  const closeBtn = document.createElement('button')
+  closeBtn.innerHTML = '&times;'
+  closeBtn.style.background = 'none'
+  closeBtn.style.border = 'none'
+  closeBtn.style.color = 'inherit'
+  closeBtn.style.fontSize = '1.5rem'
+  closeBtn.style.cursor = 'pointer'
+  closeBtn.style.padding = '0'
+  closeBtn.style.lineHeight = '1'
+  closeBtn.onclick = () => toast.remove()
+
+  actionContainer.appendChild(closeBtn)
+  toast.appendChild(actionContainer)
+
+  container.appendChild(toast)
+}
+
+let currentLogData: LogEntry[] = []
+let sortCol: keyof LogEntry = 'row'
+let sortAsc = true
+
+const openLogModal = (logData: LogEntry[]) => {
+  const modal = document.getElementById('log-modal')
+  const content = document.getElementById('log-content')
+  if (!modal || !content) return
+
+  currentLogData = logData
+  sortCol = 'row'
+  sortAsc = true
+
+  renderLogTable(content)
+  modal.classList.remove('hidden')
+}
+
+const renderLogTable = (content: HTMLElement) => {
+  const sortedData = [...currentLogData].sort((a, b) => {
+    const valA = a[sortCol] ?? ''
+    const valB = b[sortCol] ?? ''
+
+    if (valA < valB) return sortAsc ? -1 : 1
+    if (valA > valB) return sortAsc ? 1 : -1
+    return 0
+  })
+
+  const getSortIcon = (col: keyof LogEntry) => {
+    const isActive = sortCol === col
+    const icon = isActive && !sortAsc ? '▼' : '▲'
+    const className = isActive ? 'sort-icon active' : 'sort-icon inactive'
+    return `<span class="${className}">${icon}</span>`
+  }
+
+  let tableHTML = `
+    <table class="log-table">
+      <thead>
+        <tr>
+          <th data-col="action">Azione ${getSortIcon('action')}</th>
+          <th data-col="row">Riga in Excel ${getSortIcon('row')}</th>
+          <th data-col="order">Numero d'ordine ${getSortIcon('order')}</th>
+        </tr>
+      </thead>
+      <tbody>
+  `
+
+  sortedData.forEach(entry => {
+    const rowStr = entry.row !== null ? entry.row.toString() : '-'
+    tableHTML += `
+      <tr>
+        <td>${entry.action}</td>
+        <td>${rowStr}</td>
+        <td>${entry.order.toUpperCase()}</td>
+      </tr>
+    `
+  })
+
+  tableHTML += `
+      </tbody>
+    </table>
+  `
+
+  content.innerHTML = tableHTML
+
+  content.querySelectorAll('th').forEach(th => {
+    th.onclick = () => {
+      const col = th.dataset.col as keyof LogEntry
+      if (sortCol === col) {
+        sortAsc = !sortAsc
+      } else {
+        sortCol = col
+        sortAsc = true
+      }
+      renderLogTable(content)
+    }
+  })
+}
+
+export const setupLogModal = () => {
+  const closeBtn = document.getElementById('close-log-btn')
+  const modal = document.getElementById('log-modal')
+
+  if (closeBtn && modal) {
+    closeBtn.onclick = () => modal.classList.add('hidden')
+  }
 }

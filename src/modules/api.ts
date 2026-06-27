@@ -5,12 +5,23 @@ import { setProgress, showToast } from "./ui";
 
 import { chunk } from "lodash";
 
+export interface LogEntry {
+  action: string
+  row: number | null
+  order: string
+}
+interface ExportResult {
+  message: string
+  log_data: LogEntry[]
+}
+
 export const api = {
   analyzeDocument: (path: string, docType: string) =>
     invoke<AiResponse>("analyze_document", { path, docType }),
 
-  exportExcel: (data: PdfDataRow[], filePath: string | null) =>
-    invoke<string>("export_to_excel", { data, filePath }),
+  exportExcel: (data: PdfDataRow[], filePath: string | null) => {
+    return invoke<ExportResult>("export_to_excel", { data, filePath })
+  },
 
   checkExcelAccess: (path: string) =>
     invoke<boolean>("check_excel_access", { path }),

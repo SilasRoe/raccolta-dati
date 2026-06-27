@@ -961,3 +961,170 @@ input:checked + .slider:before {
   color: var(--text-primary);
   font-weight: bold;
 }
+
+.hidden {
+  display: none;
+}
+
+.notification-btn {
+  background: transparent;
+  border: 1px solid var(--text-color);
+  color: var(--text-color);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.log-btn {
+  display: flex;
+  gap: 6px;
+  background: transparent;
+  color: inherit;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  border: 0px;
+}
+
+.log-btn:hover {
+  opacity: 0.7;
+}
+
+.log-btn svg {
+  flex-shrink: 0;
+}
+
+#notification-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.notification {
+  min-width: 250px;
+  max-width: 90vw;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+  background-color: #4caf50;
+  color: white;
+}
+
+[data-theme="dark"] .notification {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+#log-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#log-modal.hidden {
+  display: none;
+}
+
+#log-modal .modal-content {
+  background: #ffffff;
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+[data-theme="dark"] #log-modal .modal-content {
+  background: #1e1e1e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+#close-log-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 24px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.log-table th,
+.log-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.log-table th {
+  font-weight: 600;
+  color: var(--text-color);
+  background: rgba(128, 128, 128, 0.1);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+
+.log-table tr:hover {
+  background: rgba(128, 128, 128, 0.05);
+}
+
+.log-table th:hover {
+  background: rgba(128, 128, 128, 0.2);
+}
+
+.sort-icon {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.85em;
+  transition: opacity 0.2s ease;
+}
+
+.sort-icon.active {
+  color: var(--text-color);
+  opacity: 1;
+}
+
+.sort-icon.inactive {
+  opacity: 0.3;
+}

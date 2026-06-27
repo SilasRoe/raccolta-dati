@@ -1,6 +1,7 @@
 use crate::modules::utils::{adjust_formula, close_excel_if_open, parse_date, token_similarity};
 
 use chrono::NaiveDate;
+use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -33,6 +34,18 @@ struct SheetRow {
     supplier: String,
     order_number: String,
     date: NaiveDate,
+}
+
+#[derive(Serialize)]
+pub struct LogEntry {
+    pub action: String,
+    pub row: Option<u32>,
+    pub order: String,
+}
+#[derive(Serialize)]
+pub struct ExportResult {
+    pub message: String,
+    pub log_data: Vec<LogEntry>,
 }
 
 #[command]
@@ -72,10 +85,12 @@ pub async fn export_to_excel(
     app: tauri::AppHandle,
     mut data: Vec<ExportRow>,
     file_path: Option<String>,
-) -> Result<String, String> {
+) -> Result<ExportResult, String> {
     if data.is_empty() {
         return Err("Nessun dato selezionato.".to_string());
     }
+
+    let mut log_data: Vec<LogEntry> = Vec::new();
 
     data.sort_by(|a, b| {
         let a_is_invoice = a.gelieferte_menge.is_some();
@@ -94,7 +109,7 @@ pub async fn export_to_excel(
 
         match file_path_opt {
             Some(p) => p.into_path().map_err(|e| e.to_string())?,
-            None => return Ok("Interruzione da parte dell'utente".to_string()),
+            None => return Err("Nessun file selezionato.".to_string()),
         }
     };
     if let Some(path_str) = path_buf.to_str() {
@@ -299,6 +314,12 @@ pub async fn export_to_excel(
                 sheet.get_cell_mut((18, row_idx)).set_value(v);
             }
 
+            log_data.push(LogEntry {
+                action: "Aggiornato".to_string(),
+                row: Some(row_idx),
+                order: order_nr.clone(),
+            });
+
             updated_count += 1;
         } else {
             let mut found_in_pending = false;
@@ -362,6 +383,13 @@ pub async fn export_to_excel(
                         }
                     }
                     found_in_pending = true;
+
+                    log_data.push(LogEntry {
+                        action: "Aggiornato".to_string(),
+                        row: None,
+                        order: order_nr.clone(),
+                    });
+
                     updated_count += 1;
                 }
             }
@@ -530,6 +558,17 @@ pub async fn export_to_excel(
             for (i, row_data) in batch.iter().enumerate() {
                 let r = start_row + i as u32;
 
+                let order_log = row_data
+                    .nummer_auftrag
+                    .as_deref()
+                    .unwrap_or("-")
+                    .to_string();
+                log_data.push(LogEntry {
+                    action: "Aggiunto".to_string(),
+                    row: Some(r),
+                    order: order_log,
+                });
+
                 if template_height > 0.0 {
                     let row_dim = sheet.get_row_dimension_mut(&r);
                     row_dim.set_height(template_height);
@@ -612,8 +651,11 @@ pub async fn export_to_excel(
     }
 
     let inserted_count = rows_to_insert.len();
-    Ok(format!(
-        "Finito: {} aggiornati, {} nuovi inseriti.",
-        updated_count, inserted_count
-    ))
+    Ok(ExportResult {
+        message: format!(
+            "Finito: {} aggiornati, {} nuovi inseriti.",
+            updated_count, inserted_count
+        ),
+        log_data,
+    })
 }
